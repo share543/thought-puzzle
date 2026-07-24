@@ -397,48 +397,228 @@ function getSelectedFragments() {
     return ids.map(id => appData.fragments.find(f => f.id === id)).filter(Boolean);
 }
 
+// ===== ✨ AI 思緒融合引擎 =====
+
+// Chinese language-aware significance scoring
+const MERGE_STOP_WORDS = new Set([
+    '這個','那個','什麼','一個','可以','沒有','不是','就是','如果','因為',
+    '所以','但是','而且','然後','覺得','知道','應該','可能','需要','想要',
+    '他們','自己','我們','你們','還有','之後','之前','目前','現在','已經',
+    '不會','就是說','意思','方式','東西','時候','部分','方面','地方','問題',
+    '開始','最後','完全','直接','其實','起來','成為','只是','一些','以後',
+    '的話','一樣','一起','比較','甚至','主要','包括','以下','來自','之間',
+    '很多','透過','不同','看到','這些','發現','這邊','還是','因為','還是',
+    '或是','或是','真的','還是','這樣','那樣','什麼','如何','什麼'
+]);
+
+function extractKeyTerms(text) {
+    if (!text) return [];
+    const raw = text.split(/[\s,，。、！？\n：；:;()（）「」『』""''【】《》…—·]+/)
+        .filter(w => w.length >= 2 && !MERGE_STOP_WORDS.has(w))
+        .filter(w => /^[\u4e00-\u9fff_a-zA-Z0-9]+$/.test(w));
+    const freq = {};
+    raw.forEach(w => { freq[w] = (freq[w] || 0) + 1; });
+    // Return unique terms sorted by frequency, capped at 15
+    return Object.entries(freq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15)
+        .map(e => e[0]);
+}
+
+function calcSimilarity(termsA, termsB) {
+    if (!termsA.length || !termsB.length) return 0;
+    const intersect = termsA.filter(t => termsB.includes(t)).length;
+    const union = new Set([...termsA, ...termsB]).size;
+    if (union === 0) return 0;
+    // Jaccard × weight boost for strong overlap
+    const jaccard = intersect / union;
+    const overlapRatio = intersect / Math.min(termsA.length, termsB.length);
+    return Math.round((jaccard * 0.6 + overlapRatio * 0.4) * 100);
+}
+
+function clusterFragments(fragments) {
+    // Extract key terms per fragment
+    const withTerms = fragments.map(f => ({
+        ...f,
+        keyTerms: extractKeyTerms(f.content)
+    }));
+
+    // Build similarity matrix
+    const n = withTerms.length;
+    const sim = Array.from({ length: n }, () => Array(n).fill(0));
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+            sim[i][j] = sim[j][i] = calcSimilarity(withTerms[i].keyTerms, withTerms[j].keyTerms);
+        }
+    }
+
+    // Greedy clustering (threshold 25, flexible)
+    const threshold = 25;
+    const assigned = new Set();
+    const clusters = [];
+    for (let i = 0; i < n; i++) {
+        if (assigned.has(i)) continue;
+        const cluster = [i];
+        assigned.add(i);
+        for (let j = i + 1; j < n; j++) {
+            if (assigned.has(j)) continue;
+            // Check similarity to ANY member in the cluster
+            const maxSim = Math.max(...cluster.map(m => sim[m][j]));
+            if (maxSim >= threshold) {
+                cluster.push(j);
+                assigned.add(j);
+            }
+        }
+        clusters.push(cluster);
+    }
+
+    return { clusters, withTerms, sim };
+}
+
+function generateTheme(clusterFrags) {
+    // Collect all tags, pick top
+    const tagFreq = {};
+    const termFreq = {};
+    clusterFrags.forEach(f => {
+        (f.tags || []).forEach(t => { tagFreq[t] = (tagFreq[t] || 0) + 1; });
+        (f.keyTerms || []).forEach(t => { termFreq[t] = (termFreq[t] || 0) + 1; });
+    });
+
+    const topTags = Object.entries(tagFreq).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
+    const topTerms = Object.entries(termFreq).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
+
+    // Build theme name
+    if (topTags.length >= 2) return topTags.join('、');
+    if (topTags.length === 1) {
+        const extra = topTerms.length > 0 ? ' & ' + topTerms[0] : '';
+        return topTags[0] + extra;
+    }
+    return topTerms.slice(0, 3).join('、') || '未歸類';
+}
+
+function buildNarrative(fragments, guide) {
+    const { clusters, withTerms } = clusterFragments(fragments);
+    const sorted = [...withTerms].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+    // Stage 1: Understanding — what are we working with?
+    const allTags = [...new Set(sorted.flatMap(f => f.tags || []))];
+    const totalTerms = [...new Set(sorted.flatMap(f => f.keyTerms || []))];
+
+    // Stage 2: Structure — generate sections
+    const sections = [];
+
+    clusters.forEach((indices) => {
+        const cFrags = indices.map(i => sorted[i]).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        const theme = generateTheme(cFrags);
+
+        // Build section body: weave fragments into flowing paragraphs
+        const body = cFrags.map(f => {
+            const text = f.content.trim();
+            // If content ends without period, add one
+            return text.endsWith('。') || text.endsWith('！') || text.endsWith('？') || text.endsWith('…') || text.endsWith('.') || text.endsWith('!') || text.endsWith('?')
+                ? text : text + '。';
+        }).join(' ');
+
+        sections.push({ theme, body, fragIds: cFrags.map(f => f.id) });
+    });
+
+    // Stage 3: Introduction — overall context
+    const introParts = [];
+    if (allTags.length) {
+        introParts.push(`本文圍繞 ${allTags.map(t => '「' + t + '」').join('、')} 等面向展開`);
+    }
+    if (totalTerms.length > 2) {
+        const topK = totalTerms.slice(0, 5).join('、');
+        introParts.push(`關鍵概念包括 ${topK}`);
+    }
+    if (guide) {
+        introParts.push(`以下是依照「${guide}」形式所整理的完整內容`);
+    }
+    const intro = introParts.length > 0
+        ? `${introParts.join('，')}。`
+        : '以下是將多個思維碎片融合後的完整整理。';
+
+    // Stage 4: Conclusion
+    let conclusion = '綜合以上所述，';
+    if (clusters.length >= 2) {
+        const themes = sections.map(s => '「' + s.theme + '」').join('與');
+        conclusion += `從 ${themes} 等不同角度可以更全面地理解這個主題。`;
+    } else if (sections.length === 1) {
+        conclusion += `「${sections[0].theme}」是貫穿這些想法的核心線索。`;
+    } else {
+        conclusion += '這些想法共同勾勒出一個值得持續探索的方向。';
+    }
+
+    // Stage 5: Assemble markdown
+    let output = `# 🧩 思維拼圖 — 融合輸出\n\n`;
+    output += `> 🕐 ${new Date().toLocaleString('zh-TW')}  ·  ${fragments.length} 塊碎片融合\n`;
+    if (guide) output += `> 🧭 形式：${guide}\n`;
+    output += `\n---\n\n`;
+
+    // Intro paragraph
+    output += `${intro}\n\n---\n\n`;
+
+    // Sections
+    sections.forEach((s, i) => {
+        output += `## ${i + 1}. ${s.theme}\n\n`;
+        output += `${s.body}\n\n`;
+
+        // Smart bridge between sections
+        if (i < sections.length - 1 && sections.length > 1) {
+            const next = sections[i + 1];
+            output += `_從「${s.theme}」延伸來看，` +
+                (next.theme ? `「${next.theme}」是另一個值得探討的角度。_` : `以下面向也很值得探討。_`) +
+                `\n\n---\n\n`;
+        }
+    });
+
+    // Conclusion
+    output += `## 總結\n\n${conclusion}\n\n`;
+    output += `---\n\n*🧩 ${fragments.length} 塊碎片經思緒融合引擎整併而成*\n`;
+
+    return output;
+}
+
 function mergeFragments() {
     const selected = getSelectedFragments();
     if (selected.length === 0) return;
 
-    const sorted = selected.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const mergeStatus = document.getElementById('mergeStatus');
+    mergeStatus.classList.remove('hidden');
+    mergeBtn.disabled = true;
 
-    let output = `# 🧩 思維拼圖 — 整併輸出\n\n`;
-    output += `> 整併時間：${new Date().toLocaleString('zh-TW')}\n`;
-    output += `> 碎片數量：${sorted.length}\n\n---\n\n`;
-
-    sorted.forEach((f, i) => {
-        const tags = (f.tags || []).map(t => '`#' + t + '`').join(' ');
-        const si = f.status === '靈感' ? '💡' : f.status === '待擴展' ? '🔍' : '✅';
-        output += `## ${si} 碎片 ${i + 1}\n\n`;
-        if (tags) output += `${tags}\n\n`;
-        output += `${f.content}\n\n---\n\n`;
-    });
-
-    output += `\n*共 ${sorted.length} 塊碎片整併而成*\n`;
-    mergeContent.textContent = output;
-    mergeResult.classList.remove('hidden');
+    // Defer to let UI update
+    setTimeout(() => {
+        const guide = document.getElementById('mergeGuide').value.trim();
+        const output = buildNarrative(selected, guide);
+        mergeContent.textContent = output;
+        mergeResult.classList.remove('hidden');
+        mergeStatus.classList.add('hidden');
+        mergeBtn.disabled = false;
+        mergeBtn.textContent = '✨ 重新整併';
+    }, 50);
 }
 
 function exportMarkdown() {
     const selected = getSelectedFragments();
     if (selected.length === 0) return;
 
-    const sorted = selected.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    // If merge was already run, export that result; otherwise run merge first
+    if (mergeResult.classList.contains('hidden')) {
+        mergeFragments();
+        // Poll for result (merge runs asynchronously)
+        const check = setInterval(() => {
+            if (!mergeResult.classList.contains('hidden')) {
+                clearInterval(check);
+                const md = mergeContent.textContent;
+                downloadFile('思維拼圖-融合輸出.md', md, 'text/markdown');
+            }
+        }, 100);
+        return;
+    }
 
-    let md = `# 🧩 思維拼圖 — 整併輸出\n\n`;
-    md += `> 整併時間：${new Date().toLocaleString('zh-TW')}\n`;
-    md += `> 碎片數量：${sorted.length}\n\n---\n\n`;
-
-    sorted.forEach((f, i) => {
-        const tags = (f.tags || []).map(t => '`#' + t + '`').join(' ');
-        const si = f.status === '靈感' ? '💡' : f.status === '待擴展' ? '🔍' : '✅';
-        md += `## ${si} 碎片 ${i + 1}\n\n`;
-        if (tags) md += `${tags}\n\n`;
-        md += `${f.content}\n\n---\n\n`;
-    });
-
-    downloadFile('思維拼圖-整併.md', md, 'text/markdown');
+    const md = mergeContent.textContent;
+    downloadFile('思維拼圖-融合輸出.md', md, 'text/markdown');
 }
 
 // ===== Import / Export JSON =====

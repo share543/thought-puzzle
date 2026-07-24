@@ -134,12 +134,17 @@
         <div class="merge-section">
             <h2>📦 整併產出</h2>
             <div class="merge-card">
+                <div class="merge-guide">
+                    <label for="mergeGuide">🧭 整併指引（可選）— 你希望整併成什麼樣的產出？</label>
+                    <textarea id="mergeGuide" rows="2" placeholder="例如：一篇部落格文章 / 簡報大綱 / 行動計畫 / 學習筆記… 留空則自動整合為流暢文章"></textarea>
+                </div>
                 <p>選擇要整併的碎片：</p>
                 <div id="mergeList" class="merge-list"></div>
                 <div class="merge-actions">
-                    <button id="mergeBtn" class="btn-merge" disabled>📦 整併選取的碎片</button>
+                    <button id="mergeBtn" class="btn-merge" disabled>✨ AI 智慧整併</button>
                     <button id="exportBtn" class="btn-export" disabled>📥 匯出 Markdown</button>
                 </div>
+                <div id="mergeStatus" class="merge-status hidden">🧠 正在分析碎片並融合思緒…</div>
                 <div id="mergeResult" class="merge-result hidden">
                     <h3>📄 整併結果</h3>
                     <pre id="mergeContent"></pre>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧩 思維拼圖 v2</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ===== Header ===== -->
+    <header class="header">
+        <h1>🧩 思維拼圖</h1>
+        <p class="subtitle">收集碎片想法，拼出完整思維</p>
+    </header>
+
+    <!-- ===== Top Nav ===== -->
+    <nav class="top-nav">
+        <button class="nav-tab active" data-tab="input">📝 輸入想法</button>
+        <button class="nav-tab" data-tab="board">🧩 拼圖牆</button>
+        <button class="nav-tab" data-tab="guide">💬 對話引導</button>
+        <button class="nav-tab" data-tab="merge">📦 整併產出</button>
+    </nav>
+
+    <!-- ===== Tab: Input ===== -->
+    <section class="tab-panel active" id="panelInput">
+        <div class="input-section">
+            <div class="input-card">
+                <textarea id="thoughtInput" placeholder="✍️ 寫下你的想法..." rows="3" maxlength="500"></textarea>
+                <div class="input-bottom">
+                    <div class="tag-area">
+                        <span class="tag-label">🏷️ 標籤：</span>
+                        <div id="tagBtns" class="tag-btns"></div>
+                        <input id="tagInput" type="text" placeholder="新標籤 + Enter" class="tag-input">
+                    </div>
+                    <div class="status-area">
+                        <select id="statusSelect">
+                            <option value="靈感">💡 靈感</option>
+                            <option value="待擴展">🔍 待擴展</option>
+                            <option value="已完成">✅ 已完成</option>
+                        </select>
+                    </div>
+                </div>
+                <button id="addBtn" class="btn-add">🧩 加入拼圖</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Tab: Board ===== -->
+    <section class="tab-panel" id="panelBoard">
+        <div class="filter-bar">
+            <div class="filter-left">
+                <h2>拼圖牆 <span id="totalBadge" class="badge">0</span></h2>
+            </div>
+            <div class="filter-right">
+                <select id="filterStatus">
+                    <option value="">全部狀態</option>
+                    <option value="靈感">💡 靈感</option>
+                    <option value="待擴展">🔍 待擴展</option>
+                    <option value="已完成">✅ 已完成</option>
+                </select>
+                <select id="filterTag">
+                    <option value="">全部標籤</option>
+                </select>
+                <input id="searchInput" type="text" placeholder="🔍 搜尋..." class="search-input">
+            </div>
+        </div>
+        <div class="board-section">
+            <div id="puzzleBoard" class="puzzle-board"></div>
+            <div id="emptyState" class="empty-state">
+                <div class="empty-icon">🧩</div>
+                <p>還沒有拼圖碎片</p>
+                <p class="muted">去「輸入想法」加入你的第一個想法吧！</p>
+            </div>
+        </div>
+        <div class="progress-section">
+            <div class="progress-card">
+                <div class="progress-label">
+                    <span>整併進度</span>
+                    <span id="progressText">0 / 0 已完成</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Tab: Guided Dialog ===== -->
+    <section class="tab-panel" id="panelGuide">
+        <div class="guide-section">
+            <div class="guide-card">
+                <h2>💬 對話引導</h2>
+                <p class="guide-desc">選擇一個引導框架，幫你把模糊的想法展開成清楚的思想</p>
+
+                <!-- Framework Selector -->
+                <div class="framework-selector">
+                    <label>🧭 引導框架：</label>
+                    <select id="frameworkSelect">
+                        <option value="5w1h">5W1H — 全面提問法</option>
+                        <option value="swot">SWOT — 優勢劣勢機會威脅</option>
+                        <option value="hats">六頂思考帽 — 多角度思考</option>
+                        <option value="free">自由對話 — 隨意問答</option>
+                    </select>
+                </div>
+
+                <!-- Topic Input -->
+                <div class="topic-setup">
+                    <input id="topicInput" type="text" placeholder="你想探討的主題是什麼？" class="topic-input">
+                    <button id="startGuideBtn" class="btn-add">🚀 開始對話</button>
+                </div>
+
+                <!-- Dialog Area -->
+                <div id="dialogArea" class="dialog-area hidden">
+                    <div id="dialogMessages" class="dialog-messages"></div>
+                    <div class="dialog-input-row">
+                        <input id="guideReplyInput" type="text" placeholder="輸入你的想法..." class="dialog-reply-input">
+                        <button id="guideReplyBtn" class="btn-add small">回覆</button>
+                    </div>
+                    <div id="guideControls" class="guide-controls">
+                        <button id="nextQuestionBtn" class="btn-footer">⏭ 下一題</button>
+                        <button id="skipQuestionBtn" class="btn-footer">跳過</button>
+                        <button id="saveDialogBtn" class="btn-add small">💾 儲存對話為碎片</button>
+                        <button id="endDialogBtn" class="btn-footer danger">結束對話</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Tab: Merge ===== -->
+    <section class="tab-panel" id="panelMerge">
+        <div class="merge-section">
+            <h2>📦 整併產出</h2>
+            <div class="merge-card">
+                <p>選擇要整併的碎片：</p>
+                <div id="mergeList" class="merge-list"></div>
+                <div class="merge-actions">
+                    <button id="mergeBtn" class="btn-merge" disabled>📦 整併選取的碎片</button>
+                    <button id="exportBtn" class="btn-export" disabled>📥 匯出 Markdown</button>
+                </div>
+                <div id="mergeResult" class="merge-result hidden">
+                    <h3>📄 整併結果</h3>
+                    <pre id="mergeContent"></pre>
+                    <button id="copyBtn" class="btn-copy">📋 複製到剪貼簿</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Footer ===== -->
+    <footer class="footer">
+        <div class="footer-actions">
+            <button id="exportJsonBtn" class="btn-footer">💾 匯出 JSON</button>
+            <button id="importJsonBtn" class="btn-footer">📂 匯入 JSON</button>
+            <input type="file" id="importFile" accept=".json" style="display:none">
+            <button id="clearAllBtn" class="btn-footer danger">🗑️ 清除全部</button>
+        </div>
+        <p class="footer-note">資料儲存在瀏覽器 localStorage</p>
+    </footer>
+
+    <!-- ===== Edit Modal ===== -->
+    <div id="editModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>✏️ 編輯想法</h3>
+            <textarea id="editContent" rows="4" maxlength="500"></textarea>
+            <input id="editTags" type="text" placeholder="標籤 (逗號分隔)">
+            <select id="editStatus">
+                <option value="靈感">💡 靈感</option>
+                <option value="待擴展">🔍 待擴展</option>
+                <option value="已完成">✅ 已完成</option>
+            </select>
+            <div class="modal-btns">
+                <button id="saveEditBtn" class="btn-add">💾 儲存</button>
+                <button id="cancelEditBtn" class="btn-footer">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -713,10 +713,13 @@ function mergeFragments() {
         mergeBtn.textContent = '✨ LLM 整併中…';
 
         llmMergeFragments(selected, guide).then(output => {
+            mergeStatus.classList.add('hidden');
+            mergeBtn.disabled = false;
+            mergeBtn.textContent = '✨ 重新整併';
+
             if (output) {
                 mergeContent.textContent = output;
                 mergeResult.classList.remove('hidden');
-                // Add LLM badge to result heading
                 const heading = mergeResult.querySelector('h3');
                 if (!heading.querySelector('.llm-badge')) {
                     const badge = document.createElement('span');
@@ -724,24 +727,20 @@ function mergeFragments() {
                     badge.textContent = '🤖 LLM 生成';
                     heading.appendChild(badge);
                 }
+            } else {
+                // LLM returned null — fallback to algorithm
+                mergeStatus.textContent = '⚠️ LLM 生成失敗，降級為演算法模式…';
+                setTimeout(() => {
+                    const fallback = buildNarrative(selected, guide);
+                    mergeContent.textContent = fallback;
+                    mergeResult.classList.remove('hidden');
+                    mergeStatus.classList.add('hidden');
+                }, 100);
             }
-            mergeStatus.classList.add('hidden');
-            mergeBtn.disabled = false;
-            mergeBtn.textContent = '✨ 重新整併';
-        }).catch(() => {
-            // Fallback: try algorithm
-            mergeStatus.textContent = '⚠️ LLM 失敗，降級為演算法模式…';
-            setTimeout(() => {
-                const output = buildNarrative(selected, guide);
-                mergeContent.textContent = output;
-                mergeResult.classList.remove('hidden');
-                mergeStatus.classList.add('hidden');
-                mergeBtn.disabled = false;
-                mergeBtn.textContent = '✨ 重新整併';
-            }, 100);
         });
     } else {
         // Algorithm path (synchronous)
+        mergeStatus.textContent = '🧠 正在分析碎片並融合思緒…';
         setTimeout(() => {
             const output = buildNarrative(selected, guide);
             mergeContent.textContent = output;
@@ -749,7 +748,7 @@ function mergeFragments() {
             mergeStatus.classList.add('hidden');
             mergeBtn.disabled = false;
             mergeBtn.textContent = '✨ 重新整併';
-        }, 50);
+        }, 300);
     }
 }
 

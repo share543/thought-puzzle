@@ -520,31 +520,251 @@ let guideState = null;
 
 function synthesizeTopics() {
     if (appData.fragments.length === 0) return null;
+    const frags = appData.fragments;
 
-    const tags = {};
-    const words = {};
-    const statuses = { 靈感: 0, 待擴展: 0, 已完成: 0 };
-    const sources = {};
+    // Chinese stop words
+    const stopWords = new Set([
+        '這個','那個','什麼','一個','可以','沒有','不是','就是',
+        '如果','因為','所以','但是','而且','然後','覺得','知道',
+        '應該','可能','需要','想要','他們','自己','我們','你們',
+        '還有','之後','之前','目前','現在','已經','不會','就是說',
+        '意思','方式','東西','時候','部分','方面','地方','問題',
+        '開始','最後','完全','直接','其實','起來','成為','只是',
+        '一些','以後','的話','一樣','一起','比較','甚至','主要',
+        '包括','以下','來自','之間','很多','透過','不同','看到',
+        '這些','發現','這邊'
+    ]);
 
-    appData.fragments.forEach(f => {
-        (f.tags || []).forEach(t => { tags[t] = (tags[t] || 0) + 1; });
-        f.content.split(/[\s,，。、！？\n]+/).filter(w => w.length > 1).forEach(w => {
-            words[w] = (words[w] || 0) + 1;
+    // === 1. Extract tags, content words ===
+    const tagFreq = {};
+    const tagPair = {};
+    const fragData = [];
+
+    frags.forEach(f => {
+        const tags = (f.tags || []).filter(Boolean);
+        const content = f.content || '';
+        // Significant words: Chinese/alpha-numeric, ≥2 chars, not stop words
+        const words = [...new Set(
+            content.split(/[\s,，。、！？\n：；:;()（）「」『』""''【】《》…—·]+/)
+                .filter(w => w.length >= 2 && !stopWords.has(w))
+                .filter(w => /^[\u4e00-\u9fff_a-zA-Z0-9]+$/.test(w))
+        )];
+
+        tags.forEach(t => { tagFreq[t] = (tagFreq[t] || 0) + 1; });
+        tags.forEach((t1, i) =>
+            tags.slice(i + 1).forEach(t2 => {
+                const key = t1 < t2 ? t1 + '||' + t2 : t2 + '||' + t1;
+                tagPair[key] = (tagPair[key] || 0) + 1;
+            })
+        );
+
+        fragData.push({
+            id: f.id, tags, words, status: f.status, content,
+            updatedAt: f.updatedAt || f.createdAt || ''
         });
-        statuses[f.status] = (statuses[f.status] || 0) + 1;
-        sources[f.source || '手動輸入'] = (sources[f.source || '手動輸入'] || 0) + 1;
     });
 
-    // Top tags & keywords (exclude generic noise)
-    const stopWords = ['這個', '那個', '什麼', '一個', '可以', '沒有', '不是', '就是', '如果', '因為', '所以', '但是', '而且', '然後', '覺得', '知道', '應該', '可能', '需要', '想要', '他們', '自己', '我們', '你們', '還有', '之後', '之前', '目前', '現在', '已經', '會不', '不會'];
-    const topTags = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    const topWords = Object.entries(words).filter(([w]) => w.length > 1 && !stopWords.includes(w)).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    // === 2. Tag co-occurrence → topic clusters ===
+    const adj = {};
+    Object.entries(tagPair).forEach(([pair, count]) => {
+        const [t1, t2] = pair.split('||');
+        if (!adj[t1]) adj[t1] = [];
+        if (!adj[t2]) adj[t2] = [];
+        adj[t1].push({ tag: t2, w: count });
+        adj[t2].push({ tag: t1, w: count });
+    });
 
-    // Detect theme candidates from tags + frequent words
-    const themeCandidates = [...topTags.map(([t]) => t), ...topWords.map(([w]) => w)];
-    const suggestedTopic = themeCandidates.length > 0 ? themeCandidates.slice(0, 3).join('、') : '未分類想法';
+    const used = new Set();
+    const clusters = [];
+    Object.entries(tagFreq)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([tag]) => {
+            if (used.has(tag)) return;
+            const members = [tag];
+            used.add(tag);
+            (adj[tag] || [])
+                .filter(n => !used.has(n.tag))
+                .sort((a, b) => b.w - a.w)
+                .slice(0, 3)
+                .forEach(n => { members.push(n.tag); used.add(n.tag); });
+            clusters.push(members);
+        });
 
-    return { topTags, topWords, statuses, sources, suggestedTopic, total: appData.fragments.length };
+    // === 3. Assign tagged fragments ===
+    const assign = clusters.map(() => []);
+    const orphanSet = new Set();
+
+    fragData.forEach(fd => {
+        if (fd.tags.length === 0) { orphanSet.add(fd.id); return; }
+        let best = -1, bestScore = 0;
+        clusters.forEach((ctags, ci) => {
+            const score = fd.tags.filter(t => ctags.includes(t)).length;
+            if (score > bestScore) { bestScore = score; best = ci; }
+        });
+        bestScore > 0 ? assign[best].push(fd) : orphanSet.add(fd.id);
+    });
+
+    // === 4. Cluster keyword extraction ===
+    const clusterKws = clusters.map((ctags, ci) => {
+        const kw = {};
+        assign[ci].forEach(fd => fd.words.forEach(w => { kw[w] = (kw[w] || 0) + 1; }));
+        return Object.entries(kw).sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+    });
+
+    // Re-try orphans: match by content keyword (≥2 shared)
+    fragData.filter(fd => orphanSet.has(fd.id) && fd.words.length > 0).forEach(fd => {
+        let best = -1, bestScore = 0;
+        clusterKws.forEach((kws, ci) => {
+            const s = fd.words.filter(w => kws.includes(w)).length;
+            if (s > bestScore) { bestScore = s; best = ci; }
+        });
+        if (bestScore >= 2) { assign[best].push(fd); orphanSet.delete(fd.id); }
+    });
+
+    const orphans = fragData.filter(fd => orphanSet.has(fd.id));
+
+    // === 5. Cluster insights ===
+    const clusterInfo = clusters.map((ctags, ci) => {
+        const m = assign[ci];
+        const done = m.filter(fd => fd.status === '已完成').length;
+        const recent = m.filter(fd => {
+            const t = new Date(fd.updatedAt).getTime();
+            return t && Date.now() - t < 7 * 86400000;
+        }).length;
+        return {
+            tags: ctags,
+            memberCount: m.length,
+            doneCount: done,
+            pctDone: m.length > 0 ? Math.round(done / m.length * 100) : 0,
+            topWords: clusterKws[ci].slice(0, 4),
+            samples: m.slice(0, 3).map(fd => fd.content.substring(0, 35)),
+            recent
+        };
+    }).filter(c => c.memberCount > 0);
+
+    // === 6. Global stats ===
+    const total = frags.length;
+    const totalDone = frags.filter(f => f.status === '已完成').length;
+    const totalExpand = frags.filter(f => f.status === '待擴展').length;
+    const totalIdea = frags.filter(f => f.status === '靈感').length;
+
+    const stuckCluster = clusterInfo.filter(c => c.memberCount >= 2)
+        .sort((a, b) => a.pctDone - b.pctDone)[0];
+    const largestCluster = clusterInfo.sort((a, b) => b.memberCount - a.memberCount)[0];
+
+    // === 7. Suggest topic ===
+    let suggestedTopic = '未分類想法';
+    if (largestCluster && largestCluster.tags.length) {
+        suggestedTopic = largestCluster.tags.join('、');
+    } else if (orphans.length) {
+        const wc = {};
+        orphans.forEach(fd => fd.words.forEach(w => { wc[w] = (wc[w] || 0) + 1; }));
+        const top = Object.entries(wc).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
+        if (top.length) suggestedTopic = top.join('、');
+    }
+
+    return {
+        total, totalDone, totalExpand, totalIdea,
+        clusterInfo,
+        orphans: orphans.map(fd => ({
+            id: fd.id, snippet: fd.content.substring(0, 50) + (fd.content.length > 50 ? '…' : ''),
+            words: fd.words.slice(0, 4), status: fd.status
+        })),
+        stuckCluster,
+        largestCluster,
+        suggestedTopic
+    };
+}
+
+function buildSynthesisIntro(analysis, topic) {
+    const lines = ['🧠 開始「全局分析」！\n'];
+    lines.push(`📊 共 ${analysis.total} 塊碎片 — 其中 💡 靈感 ${analysis.totalIdea}、🔍 待擴展 ${analysis.totalExpand}、✅ 已完成 ${analysis.totalDone}`);
+
+    if (analysis.clusterInfo.length) {
+        lines.push('');
+        lines.push('📌 主題叢集：');
+        analysis.clusterInfo.forEach(c => {
+            const pct = c.pctDone;
+            const gauge = pct === 100 ? '✅' : pct >= 50 ? '🔄' : pct === 0 ? '🆕' : '📝';
+            lines.push(`  ${gauge} ${c.tags.join('、')} — ${c.memberCount} 塊碎片，完成 ${pct}%`);
+        });
+    }
+
+    if (analysis.orphans.length) {
+        lines.push('');
+        lines.push(`🫥 孤立碎片 ${analysis.orphans.length} 塊 — 暫未歸入任何主題`);
+        analysis.orphans.slice(0, 3).forEach(o => {
+            lines.push(`  · ${o.snippet}`);
+        });
+    }
+
+    if (analysis.stuckCluster) {
+        lines.push('');
+        lines.push(`⚠️ 卡關主題：「${analysis.stuckCluster.tags.join('、')}」只有 ${analysis.stuckCluster.pctDone}% 完成度，值得用力推一把`);
+    }
+
+    lines.push(`\n💡 建議主題：${topic}`);
+    return lines.join('\n');
+}
+
+function buildSynthesisQuestions(analysis, topic) {
+    const t = topic || '你的想法';
+    const qs = [];
+
+    // --- Q1: Cluster map intro ---
+    if (analysis.clusterInfo.length >= 2) {
+        const names = analysis.clusterInfo.map(c => '「' + c.tags.join('、') + '」').join('、');
+        qs.push(`你目前有 ${analysis.clusterInfo.length} 個主題方向：${names}。你覺得這些主題之間有什麼關聯或衝突？`);
+    } else if (analysis.clusterInfo.length === 1) {
+        const c = analysis.clusterInfo[0];
+        qs.push(`你的碎片大多集中在「${c.tags.join('、')}」這條線上（${c.memberCount} 塊碎片）。從關鍵詞${c.topWords.length ? '（' + c.topWords.join('、') + '）' : ''}來看，你最初是因為什麼契機開始這個方向的？`);
+    } else {
+        qs.push(`你的碎片還沒有形成明確的主題叢集。你覺得這些想法之間可能有什麼潛在的連結？`);
+    }
+
+    // --- Q2: Coverage gap ---
+    if (analysis.clusterInfo.length) {
+        const mostStuck = [...analysis.clusterInfo].sort((a, b) => a.pctDone - b.pctDone)[0];
+        const stuckPct = mostStuck.pctDone;
+        if (stuckPct < 30) {
+            qs.push(`「${mostStuck.tags.join('、')}」這個方向才完成 ${stuckPct}%，你覺得是缺資料、缺想法，還是缺執行動力？`);
+        } else {
+            const leastStuck = [...analysis.clusterInfo].sort((a, b) => b.pctDone - a.pctDone)[0];
+            qs.push(`「${leastStuck.tags.join('、')}」已經完成 ${leastStuck.pctDone}%，你覺得這個方向還有什麼可以再補強的嗎？`);
+        }
+    } else {
+        qs.push(`你目前的碎片大多是 ${analysis.orphans.length > 0 ? '零散的（' + analysis.orphans.length + ' 塊孤立碎片）' : '少量的'}。你覺得最缺的是哪一塊？`);
+    }
+
+    // --- Q3: Orphan integration ---
+    if (analysis.orphans.length >= 2) {
+        const snippets = analysis.orphans.slice(0, 2).map(o => '「' + o.snippet + '」').join('、');
+        qs.push(`有 ${analysis.orphans.length} 塊碎片未歸入主題，例如 ${snippets}。你覺得它們應該自成一個新主題，還是可以併入現有方向？`);
+    }
+
+    // --- Q4: Deep dive direction ---
+    if (analysis.largestCluster) {
+        const c = analysis.largestCluster;
+        qs.push(`最大的主題「${c.tags.join('、')}」有 ${c.memberCount} 塊碎片，${c.pctDone >= 80 ? '接近完成' : '還在發展中'}。你覺得這個方向最有價值的產出會是什麼？`);
+    } else {
+        qs.push(`從目前這些碎片來看，你覺得最有價值或最緊急的是哪一塊？為什麼？`);
+    }
+
+    // --- Q5: Cross-cluster synthesis ---
+    if (analysis.clusterInfo.length >= 2) {
+        const c1 = analysis.clusterInfo[0];
+        const c2 = analysis.clusterInfo[1];
+        qs.push(`如果把「${c1.tags.join('、')}」和「${c2.tags.join('、')}」整合起來，有沒有可能產生 1+1 > 2 的效果？`);
+    } else if (analysis.clusterInfo.length === 1 && analysis.orphans.length > 0) {
+        qs.push(`除了「${analysis.clusterInfo[0].tags.join('、')}」之外，你的 ${analysis.orphans.length} 塊孤立碎片有沒有可能成為第二個主題的起點？`);
+    } else {
+        qs.push(`如果只能挑一塊碎片轉化為具體行動，你會選哪個？下一步是什麼？`);
+    }
+
+    // --- Q6: Action & next step ---
+    qs.push(`總結來說，針對「${t}」你接下來的首要行動是什麼？需要什麼資源或資訊才能推進？`);
+
+    return qs.map(q => `${q}`);
 }
 
 function startGuide() {
@@ -563,24 +783,8 @@ function startGuide() {
             return;
         }
         topic = topic || analysis.suggestedTopic;
-        const tagInfo = analysis.topTags.length
-            ? '熱門標籤：' + analysis.topTags.map(([t, c]) => `#${t}(${c})`).join(' ')
-            : '';
-        const wordInfo = analysis.topWords.length
-            ? '高頻詞：' + analysis.topWords.map(([w, c]) => `${w}(${c})`).join(' ')
-            : '';
-        // Determine coverage: which positions do fragments cluster around?
-        const pctDone = Math.round((analysis.statuses['已完成'] / analysis.total) * 100);
-        questions = [
-            (t) => `你有 ${analysis.total} 塊碎片${analysis.topTags.length ? `，主要圍繞 ${analysis.topTags.map(([t]) => '「' + t + '」').join('、')}` : ''}。你覺得這些碎片之間有什麼關聯？`,
-            (t) => `關於「${t}」，你目前已經涵蓋了哪些面向？還有什麼是還沒想到的？`,
-            (t) => `從關鍵字來看（${analysis.topWords.slice(0, 4).map(([w]) => w).join('、')}），你覺得哪一塊最重要、最值得深入？`,
-            (t) => `你目前有 ${analysis.statuses['靈感'] || 0} 塊靈感、${analysis.statuses['待擴展'] || 0} 塊待擴展、${analysis.statuses['已完成'] || 0} 塊已完成（${pctDone}%）。接下來優先發展哪個方向？`,
-            (t) => `有沒有跟這些碎片相關但還沒有寫下來的新想法？`,
-            (t) => `如果要把這些碎片整合成一個完整的論述或計畫，你覺得缺少什麼關鍵環節？`,
-            (t) => `你覺得哪塊碎片最有潛力變成實際行動？下一步具體要做什麼？`,
-        ].map(q => q(topic));
-        intro = `🧠 開始「全局分析」！\n\n📊 碎片概況：共 ${analysis.total} 塊碎片\n${tagInfo}\n${wordInfo}\n💡 建議主題：${topic}`;
+        questions = buildSynthesisQuestions(analysis, topic);
+        intro = buildSynthesisIntro(analysis, topic);
     } else {
         if (!topic) { topicInput.focus(); return; }
         questions = fw.questions.map(q => q(topic));

@@ -10,7 +10,10 @@
 
     <!-- ===== Header ===== -->
     <header class="header">
-        <h1>🧩 思維拼圖</h1>
+        <div class="header-top">
+            <h1>🧩 思維拼圖</h1>
+            <button id="settingsBtn" class="btn-settings" title="LLM 設定">⚙️</button>
+        </div>
         <p class="subtitle">收集碎片想法，拼出完整思維</p>
     </header>
 
@@ -127,6 +130,7 @@
                     <div id="guideControls" class="guide-controls">
                         <button id="nextQuestionBtn" class="btn-footer">⏭ 下一題</button>
                         <button id="skipQuestionBtn" class="btn-footer">跳過</button>
+                        <button id="llmFollowUpBtn" class="btn-footer llm-btn" title="使用 LLM 產生深入追問">🤖 LLM 追問</button>
                         <button id="saveDialogBtn" class="btn-add small">💾 儲存對話為碎片</button>
                         <button id="endDialogBtn" class="btn-footer danger">結束對話</button>
                     </div>
@@ -174,6 +178,83 @@
         <p class="footer-note">資料儲存在瀏覽器 localStorage</p>
     </footer>
 
+    <!-- ===== LLM 設定 Modal ===== -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-content modal-settings">
+            <div class="settings-header">
+                <h3>⚙️ LLM 設定</h3>
+                <span class="settings-subtitle">使用你的 API 金鑰，讓思維拼圖更聰明</span>
+            </div>
+
+            <div class="settings-toggle-row">
+                <label class="toggle-label">
+                    <input type="checkbox" id="llmEnabled">
+                    <span class="toggle-slider"></span>
+                    啟用 LLM 功能
+                </label>
+            </div>
+
+            <div id="settingsFields" class="settings-fields">
+                <div class="field-group">
+                    <label for="llmEndpoint">API 端點 URL</label>
+                    <input id="llmEndpoint" type="url" placeholder="https://openrouter.ai/api/v1" class="settings-input">
+                    <span class="field-hint">須支援 OpenAI-compatible <code>/v1/chat/completions</code></span>
+                </div>
+
+                <div class="field-group">
+                    <label for="llmApiKey">API 金鑰</label>
+                    <div class="api-key-row">
+                        <input id="llmApiKey" type="password" placeholder="sk-..." class="settings-input">
+                        <button id="toggleKeyBtn" class="btn-icon" title="顯示/隱藏金鑰">👁️</button>
+                    </div>
+                    <span class="field-hint">僅存於瀏覽器 localStorage，不留伺服器</span>
+                </div>
+
+                <div class="field-group">
+                    <label for="llmModel">模型名稱</label>
+                    <div class="model-row">
+                        <input id="llmModel" type="text" placeholder="gpt-4o-mini" class="settings-input" list="modelSuggestions">
+                        <datalist id="modelSuggestions">
+                            <option value="gpt-4o-mini">
+                            <option value="gpt-4o">
+                            <option value="claude-sonnet-4-20250514">
+                            <option value="claude-3-5-haiku">
+                            <option value="gemini-2.0-flash-001">
+                            <option value="deepseek-chat">
+                            <option value="qwen-turbo">
+                            <option value="mistral-small-latest">
+                        </datalist>
+                    </div>
+                    <span class="field-hint">常用模型預填在上方，也可自由輸入</span>
+                </div>
+
+                <details class="settings-advanced">
+                    <summary>進階設定</summary>
+                    <div class="advanced-grid">
+                        <div class="field-group">
+                            <label for="llmTemperature">溫度 <span id="tempValue">0.7</span></label>
+                            <input id="llmTemperature" type="range" min="0" max="2" step="0.1" value="0.7" class="settings-range">
+                        </div>
+                        <div class="field-group">
+                            <label for="llmMaxTokens">最大 Token</label>
+                            <input id="llmMaxTokens" type="number" min="256" max="32000" step="256" value="4096" class="settings-input">
+                        </div>
+                    </div>
+                </details>
+
+                <div class="test-row">
+                    <button id="testConnectionBtn" class="btn-test">🔌 測試連線</button>
+                    <span id="testResult" class="test-result"></span>
+                </div>
+            </div>
+
+            <div class="modal-btns">
+                <button id="saveSettingsBtn" class="btn-add">💾 儲存設定</button>
+                <button id="cancelSettingsBtn" class="btn-footer">關閉</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== Edit Modal ===== -->
     <div id="editModal" class="modal hidden">
         <div class="modal-content">
@@ -192,6 +273,7 @@
         </div>
     </div>
 
+    <script src="js/llm-client.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

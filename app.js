@@ -216,6 +216,35 @@ const editStatus = $('editStatus');
 const saveEditBtn = $('saveEditBtn');
 const cancelEditBtn = $('cancelEditBtn');
 
+// ===== LLM Settings State =====
+const LLM_SETTINGS_KEY = 'thought-puzzle-llm-settings';
+let llmClient = null;
+let llmSettings = {
+    enabled: false,
+    endpoint: '',
+    apiKey: '',
+    model: 'gpt-4o-mini',
+    temperature: 0.7,
+    maxTokens: 4096
+};
+
+// Settings DOM refs
+const settingsBtn = $('settingsBtn');
+const settingsModal = $('settingsModal');
+const llmEnabledCheck = $('llmEnabled');
+const settingsFields = $('settingsFields');
+const llmEndpoint = $('llmEndpoint');
+const llmApiKey = $('llmApiKey');
+const toggleKeyBtn = $('toggleKeyBtn');
+const llmModel = $('llmModel');
+const llmTemperature = $('llmTemperature');
+const tempValue = $('tempValue');
+const llmMaxTokens = $('llmMaxTokens');
+const testConnectionBtn = $('testConnectionBtn');
+const testResult = $('testResult');
+const saveSettingsBtn = $('saveSettingsBtn');
+const cancelSettingsBtn = $('cancelSettingsBtn');
+
 // ===== Tab Navigation =====
 let currentTab = 'input';
 
@@ -675,16 +704,85 @@ function mergeFragments() {
     mergeStatus.classList.remove('hidden');
     mergeBtn.disabled = true;
 
-    // Defer to let UI update
-    setTimeout(() => {
-        const guide = document.getElementById('mergeGuide').value.trim();
-        const output = buildNarrative(selected, guide);
-        mergeContent.textContent = output;
-        mergeResult.classList.remove('hidden');
-        mergeStatus.classList.add('hidden');
-        mergeBtn.disabled = false;
-        mergeBtn.textContent = '✨ 重新整併';
-    }, 50);
+    const guide = document.getElementById('mergeGuide').value.trim();
+
+    // Decide path: LLM or algorithm
+    if (isLLMReady()) {
+        // LLM path (async)
+        mergeStatus.textContent = '🤖 LLM 正在融合思緒…';
+        mergeBtn.textContent = '✨ LLM 整併中…';
+
+        llmMergeFragments(selected, guide).then(output => {
+            if (output) {
+                mergeContent.textContent = output;
+                mergeResult.classList.remove('hidden');
+                // Add LLM badge to result heading
+                const heading = mergeResult.querySelector('h3');
+                if (!heading.querySelector('.llm-badge')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'llm-badge';
+                    badge.textContent = '🤖 LLM 生成';
+                    heading.appendChild(badge);
+                }
+            }
+            mergeStatus.classList.add('hidden');
+            mergeBtn.disabled = false;
+            mergeBtn.textContent = '✨ 重新整併';
+        }).catch(() => {
+            // Fallback: try algorithm
+            mergeStatus.textContent = '⚠️ LLM 失敗，降級為演算法模式…';
+            setTimeout(() => {
+                const output = buildNarrative(selected, guide);
+                mergeContent.textContent = output;
+                mergeResult.classList.remove('hidden');
+                mergeStatus.classList.add('hidden');
+                mergeBtn.disabled = false;
+                mergeBtn.textContent = '✨ 重新整併';
+            }, 100);
+        });
+    } else {
+        // Algorithm path (synchronous)
+        setTimeout(() => {
+            const output = buildNarrative(selected, guide);
+            mergeContent.textContent = output;
+            mergeResult.classList.remove('hidden');
+            mergeStatus.classList.add('hidden');
+            mergeBtn.disabled = false;
+            mergeBtn.textContent = '✨ 重新整併';
+        }, 50);
+    }
+}
+
+/**
+ * LLM 思緒融合
+ */
+async function llmMergeFragments(fragments, guide) {
+    try {
+        const messages = LLMClient.makeMergePrompt(fragments, guide);
+        const result = await llmClient.chat(messages, { temperature: 0.7, maxTokens: 4096 });
+
+        let content = result.content.trim();
+
+        // Ensure it has markdown heading if the LLM didn't include one
+        if (!content.startsWith('#')) {
+            content = '# 🧩 思維拼圖 — LLM 融合輸出\n\n' + content;
+        }
+
+        // Append metadata
+        const metaLines = [];
+        metaLines.push('');
+        metaLines.push('---');
+        metaLines.push(`*🧩 ${fragments.length} 塊碎片 • 🤖 LLM 生成 (${llmSettings.model})*`);
+        if (result.usage) {
+            metaLines.push(`*📊 ${result.usage.prompt_tokens} → ${result.usage.completion_tokens} tokens*`);
+        }
+        content += '\n' + metaLines.join('\n');
+
+        return content;
+    } catch (err) {
+        console.error('LLM merge failed:', err);
+        return null; // triggers fallback
+    }
 }
 
 function exportMarkdown() {
@@ -1168,6 +1266,238 @@ skipQuestionBtn.addEventListener('click', skipQuestion);
 saveDialogBtn.addEventListener('click', saveDialogAsFragments);
 endDialogBtn.addEventListener('click', endDialog);
 startGuideBtn.addEventListener('click', startGuide);
+
+// ===== LLM Dialogue Follow-up =====
+const llmFollowUpBtn = $('llmFollowUpBtn');
+
+llmFollowUpBtn.addEventListener('click', async () => {
+    if (!guideState) return;
+    if (!isLLMReady()) {
+        alert('⚠️ LLM 功能未啟用或尚未設定。請點右上角 ⚙️ 設定 API 端點和金鑰。');
+        return;
+    }
+
+    // Gather context: selected fragments + current dialogue history
+    const recentFrags = appData.fragments.slice(0, 10);
+    const history = guideState.messages.slice(-8);
+    const frameworkName = guideState.fwTitle;
+
+    // Show loading state
+    llmFollowUpBtn.disabled = true;
+    const loadingMsg = document.createElement('div');
+    loadingMsg.className = 'dialog-llm-loading';
+    loadingMsg.textContent = '🤖 LLM 正在思考追問…';
+    dialogMessages.appendChild(loadingMsg);
+    dialogMessages.scrollTop = dialogMessages.scrollHeight;
+
+    try {
+        const messages = LLMClient.makeGuidePrompt(
+            frameworkName,
+            guideState.topic,
+            recentFrags,
+            history
+        );
+        const result = await llmClient.chat(messages);
+        let questions;
+        try {
+            questions = JSON.parse(result.content);
+            if (!Array.isArray(questions)) throw new Error('not array');
+        } catch {
+            // If LLM didn't return clean JSON, try extracting from text
+            const match = result.content.match(/\[[\s\S]*?\]/);
+            if (match) {
+                questions = JSON.parse(match[0]);
+            } else {
+                // Fallback: split by newlines as questions
+                questions = result.content.split('\n')
+                    .filter(l => l.trim().endsWith('？') || l.trim().endsWith('?'))
+                    .map(l => l.replace(/^\d+[.、\s]+/, '').trim())
+                    .slice(0, 3);
+            }
+        }
+
+        if (!questions || questions.length === 0) {
+            questions = ['關於這個主題，你還有什麼想補充的嗎？'];
+        }
+
+        // Add LLM-generated questions to the dialog flow
+        // We insert them as additional questions right after current position
+        const llmLabel = `🤖 LLM 追問（共 ${questions.length} 題）`;
+        guideState.messages.push({ role: 'assistant', content: llmLabel });
+        questions.forEach((q, i) => {
+            const text = q.trim().replace(/^[""']|[""']$/g, '');
+            // Insert after current position
+            guideState.questions.splice(guideState.currentQ + i, 0, text);
+        });
+
+        // Show first question now if all original questions were done
+        if (guideState.currentQ >= guideState.questions.length - questions.length) {
+            guideState.messages.push({ role: 'assistant', content: questions[0].trim().replace(/^[""']|[""']$/g, '') });
+        }
+
+    } catch (err) {
+        guideState.messages.push({
+            role: 'assistant',
+            content: `⚠️ LLM 追問暫時無法使用（${err.message}）\n\n請繼續使用原本的引導問題。`
+        });
+    } finally {
+        loadingMsg.remove();
+        llmFollowUpBtn.disabled = false;
+        renderDialog();
+    }
+});
+
+// ===== LLM Settings Logic =====
+
+function loadLLMSettings() {
+    try {
+        const raw = localStorage.getItem(LLM_SETTINGS_KEY);
+        if (raw) {
+            const saved = JSON.parse(raw);
+            llmSettings = { ...llmSettings, ...saved };
+        }
+    } catch {}
+}
+
+function saveLLMSettings() {
+    // Don't save empty apiKey (avoid overwriting with blank)
+    const toSave = { ...llmSettings };
+    if (!toSave.apiKey) delete toSave.apiKey;
+    localStorage.setItem(LLM_SETTINGS_KEY, JSON.stringify(toSave));
+}
+
+function initLLMClient() {
+    const ClientClass = window.LLMClient;
+    if (!ClientClass) return;
+    if (!llmClient) {
+        llmClient = new ClientClass({
+            endpoint: llmSettings.endpoint,
+            apiKey: llmSettings.apiKey,
+            model: llmSettings.model,
+            temperature: llmSettings.temperature,
+            maxTokens: llmSettings.maxTokens
+        });
+    } else {
+        llmClient.update({
+            endpoint: llmSettings.endpoint,
+            apiKey: llmSettings.apiKey,
+            model: llmSettings.model,
+            temperature: llmSettings.temperature,
+            maxTokens: llmSettings.maxTokens
+        });
+    }
+}
+
+function isLLMReady() {
+    return llmSettings.enabled && llmClient && llmClient.isConfigured();
+}
+
+// Populate settings UI from state
+function populateSettingsUI() {
+    llmEnabledCheck.checked = llmSettings.enabled;
+    llmEndpoint.value = llmSettings.endpoint || '';
+    llmApiKey.value = llmSettings.apiKey || '';
+    llmModel.value = llmSettings.model || 'gpt-4o-mini';
+    llmTemperature.value = llmSettings.temperature;
+    tempValue.textContent = llmSettings.temperature;
+    llmMaxTokens.value = llmSettings.maxTokens;
+    updateSettingsFieldsDisabled();
+}
+
+// Read UI back into state
+function readSettingsFromUI() {
+    llmSettings.enabled = llmEnabledCheck.checked;
+    llmSettings.endpoint = llmEndpoint.value.trim();
+    llmSettings.apiKey = llmApiKey.value.trim();
+    llmSettings.model = llmModel.value.trim() || 'gpt-4o-mini';
+    llmSettings.temperature = parseFloat(llmTemperature.value) || 0.7;
+    llmSettings.maxTokens = parseInt(llmMaxTokens.value) || 4096;
+}
+
+function updateSettingsFieldsDisabled() {
+    settingsFields.classList.toggle('disabled', !llmEnabledCheck.checked);
+}
+
+// Open settings modal
+settingsBtn.addEventListener('click', () => {
+    populateSettingsUI();
+    testResult.textContent = '';
+    testResult.className = 'test-result';
+    settingsModal.classList.remove('hidden');
+});
+
+// Close settings modal
+function closeSettingsModal() {
+    settingsModal.classList.add('hidden');
+}
+cancelSettingsBtn.addEventListener('click', closeSettingsModal);
+settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) closeSettingsModal();
+});
+
+// Toggle key visibility
+let keyVisible = false;
+toggleKeyBtn.addEventListener('click', () => {
+    keyVisible = !keyVisible;
+    llmApiKey.type = keyVisible ? 'text' : 'password';
+    toggleKeyBtn.textContent = keyVisible ? '🙈' : '👁️';
+});
+
+// Temperature slider live display
+llmTemperature.addEventListener('input', () => {
+    tempValue.textContent = llmTemperature.value;
+});
+
+// Enable/disable fields toggle
+llmEnabledCheck.addEventListener('change', updateSettingsFieldsDisabled);
+
+// Test connection
+testConnectionBtn.addEventListener('click', async () => {
+    readSettingsFromUI();
+    if (!llmSettings.endpoint) {
+        testResult.textContent = '請輸入 API 端點 URL';
+        testResult.className = 'test-result error';
+        return;
+    }
+    if (!llmSettings.apiKey) {
+        testResult.textContent = '請輸入 API 金鑰';
+        testResult.className = 'test-result error';
+        return;
+    }
+
+    testResult.textContent = '⏳ 測試中…';
+    testResult.className = 'test-result';
+    testConnectionBtn.disabled = true;
+
+    try {
+        initLLMClient();
+        const result = await llmClient.testConnection();
+        testResult.textContent = result.message;
+        testResult.className = 'test-result ' + (result.ok ? 'success' : 'error');
+    } catch (err) {
+        testResult.textContent = '❌ ' + (err.message || '連線失敗');
+        testResult.className = 'test-result error';
+    } finally {
+        testConnectionBtn.disabled = false;
+    }
+});
+
+// Save settings
+saveSettingsBtn.addEventListener('click', () => {
+    readSettingsFromUI();
+    saveLLMSettings();
+    initLLMClient();
+    closeSettingsModal();
+    // Show feedback toast
+    const btn = saveSettingsBtn;
+    const origText = btn.textContent;
+    btn.textContent = '✅ 已儲存！';
+    setTimeout(() => { btn.textContent = origText; }, 2000);
+});
+
+// Init LLM on load
+loadLLMSettings();
+initLLMClient();
 
 // ===== Keyboard Shortcuts =====
 thoughtInput.addEventListener('keydown', e => {

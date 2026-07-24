@@ -678,29 +678,19 @@ function synthesizeTopics() {
 
 function buildSynthesisIntro(analysis, topic) {
     const lines = ['🧠 開始「全局分析」！\n'];
-    lines.push(`📊 共 ${analysis.total} 塊碎片 — 其中 💡 靈感 ${analysis.totalIdea}、🔍 待擴展 ${analysis.totalExpand}、✅ 已完成 ${analysis.totalDone}`);
+    lines.push(`📊 ${analysis.total} 塊碎片`);
 
     if (analysis.clusterInfo.length) {
         lines.push('');
-        lines.push('📌 主題叢集：');
-        analysis.clusterInfo.forEach(c => {
-            const pct = c.pctDone;
-            const gauge = pct === 100 ? '✅' : pct >= 50 ? '🔄' : pct === 0 ? '🆕' : '📝';
-            lines.push(`  ${gauge} ${c.tags.join('、')} — ${c.memberCount} 塊碎片，完成 ${pct}%`);
-        });
+        lines.push('📌 思考方向：');
+        analysis.clusterInfo.forEach(c =>
+            lines.push(`   ${c.tags.join('、')}（${c.memberCount} 塊）`)
+        );
     }
 
     if (analysis.orphans.length) {
         lines.push('');
-        lines.push(`🫥 孤立碎片 ${analysis.orphans.length} 塊 — 暫未歸入任何主題`);
-        analysis.orphans.slice(0, 3).forEach(o => {
-            lines.push(`  · ${o.snippet}`);
-        });
-    }
-
-    if (analysis.stuckCluster) {
-        lines.push('');
-        lines.push(`⚠️ 卡關主題：「${analysis.stuckCluster.tags.join('、')}」只有 ${analysis.stuckCluster.pctDone}% 完成度，值得用力推一把`);
+        lines.push(`🫥 ${analysis.orphans.length} 塊未歸類`);
     }
 
     lines.push(`\n💡 建議主題：${topic}`);
@@ -711,60 +701,41 @@ function buildSynthesisQuestions(analysis, topic) {
     const t = topic || '你的想法';
     const qs = [];
 
-    // --- Q1: Cluster map intro ---
+    // Q1: 方向一覽 → 關聯
     if (analysis.clusterInfo.length >= 2) {
         const names = analysis.clusterInfo.map(c => '「' + c.tags.join('、') + '」').join('、');
-        qs.push(`你目前有 ${analysis.clusterInfo.length} 個主題方向：${names}。你覺得這些主題之間有什麼關聯或衝突？`);
+        qs.push(`你的碎片分成 ${analysis.clusterInfo.length} 個方向：${names}。你覺得它們之間有關聯嗎？`);
     } else if (analysis.clusterInfo.length === 1) {
         const c = analysis.clusterInfo[0];
-        qs.push(`你的碎片大多集中在「${c.tags.join('、')}」這條線上（${c.memberCount} 塊碎片）。從關鍵詞${c.topWords.length ? '（' + c.topWords.join('、') + '）' : ''}來看，你最初是因為什麼契機開始這個方向的？`);
+        qs.push(`碎片集中在「${c.tags.join('、')}」這個方向。是什麼契機開始這個方向的？`);
     } else {
-        qs.push(`你的碎片還沒有形成明確的主題叢集。你覺得這些想法之間可能有什麼潛在的連結？`);
+        qs.push(`碎片還沒形成明確方向，你覺得它們可能有什麼潛在連結？`);
     }
 
-    // --- Q2: Coverage gap ---
+    // Q2: 缺口 → 還缺什麼
     if (analysis.clusterInfo.length) {
         const mostStuck = [...analysis.clusterInfo].sort((a, b) => a.pctDone - b.pctDone)[0];
-        const stuckPct = mostStuck.pctDone;
-        if (stuckPct < 30) {
-            qs.push(`「${mostStuck.tags.join('、')}」這個方向才完成 ${stuckPct}%，你覺得是缺資料、缺想法，還是缺執行動力？`);
+        if (mostStuck.pctDone < 30) {
+            qs.push(`「${mostStuck.tags.join('、')}」才剛起步，你覺得卡在哪裡？`);
         } else {
-            const leastStuck = [...analysis.clusterInfo].sort((a, b) => b.pctDone - a.pctDone)[0];
-            qs.push(`「${leastStuck.tags.join('、')}」已經完成 ${leastStuck.pctDone}%，你覺得這個方向還有什麼可以再補強的嗎？`);
+            qs.push(`你覺得「${t}」還有哪些面向沒有想到？`);
         }
     } else {
-        qs.push(`你目前的碎片大多是 ${analysis.orphans.length > 0 ? '零散的（' + analysis.orphans.length + ' 塊孤立碎片）' : '少量的'}。你覺得最缺的是哪一塊？`);
+        qs.push(`你覺得現在最缺的是哪一塊？`);
     }
 
-    // --- Q3: Orphan integration ---
-    if (analysis.orphans.length >= 2) {
-        const snippets = analysis.orphans.slice(0, 2).map(o => '「' + o.snippet + '」').join('、');
-        qs.push(`有 ${analysis.orphans.length} 塊碎片未歸入主題，例如 ${snippets}。你覺得它們應該自成一個新主題，還是可以併入現有方向？`);
-    }
-
-    // --- Q4: Deep dive direction ---
+    // Q3: 優先級 → 最值得深入
     if (analysis.largestCluster) {
         const c = analysis.largestCluster;
-        qs.push(`最大的主題「${c.tags.join('、')}」有 ${c.memberCount} 塊碎片，${c.pctDone >= 80 ? '接近完成' : '還在發展中'}。你覺得這個方向最有價值的產出會是什麼？`);
+        qs.push(`${c.tags.join('、')} 這條線的碎片最多，你覺得最有價值的產出是什麼？`);
     } else {
-        qs.push(`從目前這些碎片來看，你覺得最有價值或最緊急的是哪一塊？為什麼？`);
+        qs.push(`這麼多碎片，你覺得哪一塊最值得先深入？`);
     }
 
-    // --- Q5: Cross-cluster synthesis ---
-    if (analysis.clusterInfo.length >= 2) {
-        const c1 = analysis.clusterInfo[0];
-        const c2 = analysis.clusterInfo[1];
-        qs.push(`如果把「${c1.tags.join('、')}」和「${c2.tags.join('、')}」整合起來，有沒有可能產生 1+1 > 2 的效果？`);
-    } else if (analysis.clusterInfo.length === 1 && analysis.orphans.length > 0) {
-        qs.push(`除了「${analysis.clusterInfo[0].tags.join('、')}」之外，你的 ${analysis.orphans.length} 塊孤立碎片有沒有可能成為第二個主題的起點？`);
-    } else {
-        qs.push(`如果只能挑一塊碎片轉化為具體行動，你會選哪個？下一步是什麼？`);
-    }
+    // Q4: 行動 → 下一步
+    qs.push(`針對「${t}」，你接下來的第一步要做什麼？`);
 
-    // --- Q6: Action & next step ---
-    qs.push(`總結來說，針對「${t}」你接下來的首要行動是什麼？需要什麼資源或資訊才能推進？`);
-
-    return qs.map(q => `${q}`);
+    return qs;
 }
 
 function startGuide() {

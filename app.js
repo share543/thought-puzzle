@@ -473,7 +473,8 @@ function handleImport(e) {
 }
 
 function downloadFile(name, content, type) {
-    const blob = new Blob([content], { type: type + ';charset=utf-8' });
+    // Add BOM (\uFEFF) so editors recognise UTF-8 encoding on all platforms
+    const blob = new Blob(['\uFEFF' + content], { type: type + ';charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

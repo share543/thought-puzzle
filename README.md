@@ -1,38 +1,39 @@
-# 🧩 思維拼圖 Thought Puzzle
+# 🧩 Thought Puzzle
 
-Collect fragmented thoughts, piece them into complete clarity.  
-收集碎片想法，拼出完整思維。
+> Collect fragmented thoughts, piece them into complete clarity.
+
+[**中文版**](README.zh.md)
 
 A browser-based thinking tool that helps you capture, organize, connect, and synthesize ideas — no server, no install.
 
 ---
 
-## Features / 功能
+## Features
 
-### 📝 Capture / 輸入想法
+### 📝 Capture
 Write down fragments with tags and status (💡 idea / 🔍 to expand / ✅ done).
 
-### 🧩 Board / 拼圖牆
-Card-based browsing, filtering by status/tag, full-text search, progress tracking.
+### 🧩 Board
+Card-based browsing, filter by status or tag, full-text search, progress tracking.
 
-### 💬 Guided Dialog / 對話引導 — 11 frameworks
+### 💬 Guided Dialog — 11 frameworks
 
-| Framework | Use case | 適用場景 |
-|-----------|----------|----------|
-| **5W1H** | Who/What/When/Where/Why/How — comprehensive inquiry | 全面提問 |
-| **SWOT** | Strengths, Weaknesses, Opportunities, Threats | 優劣勢分析 |
-| **Six Thinking Hats** | White/Red/Black/Yellow/Green/Blue — multi-perspective | 多角度思考 |
-| **SCAMPER** | Substitute, Combine, Adapt, Modify, Put to other uses, Eliminate, Rearrange — innovation checklist | 創新發想 |
-| **First Principles ⚛️** | Deconstruct to fundamentals, rebuild from zero | 拆解重構 |
-| **Reverse Thinking 🔄** | Inversion & premortem — find blind spots | 反向思考 |
-| **Pyramid Principle 📐** | Conclusion-first, MECE logical structure | 金字塔邏輯 |
-| **GROW Model 🎯** | Goal → Reality → Options → Will (SMART action plan) | 目標行動 |
-| **PMI ⚖️** | Plus, Minus, Interesting — three-column decision | 利弊決策 |
-| **Free Dialog** | Casual Q&A | 自由問答 |
-| **🧠 Synthesis** | Auto-analyze all fragments → discover topic clusters → guide expansion | 全局分析 |
+| Framework | Best for |
+|-----------|----------|
+| **5W1H** | Comprehensive inquiry (who/what/when/where/why/how) |
+| **SWOT** | Strengths, Weaknesses, Opportunities, Threats |
+| **Six Thinking Hats** | Multi-perspective (white/red/black/yellow/green/blue) |
+| **SCAMPER** | Innovation checklist (substitute/combine/adapt/modify/put/eliminate/rearrange) |
+| **First Principles ⚛️** | Deconstruct to fundamentals, rebuild from zero |
+| **Reverse Thinking 🔄** | Inversion & premortem — uncover blind spots |
+| **Pyramid Principle 📐** | Conclusion-first, MECE logical structure |
+| **GROW Model 🎯** | Goal → Reality → Options → Will (SMART action plan) |
+| **PMI ⚖️** | Plus / Minus / Interesting — three-column decision |
+| **Free Dialog** | Casual Q&A |
+| **🧠 Synthesis** | Auto-analyze all fragments → detect topic clusters → guide expansion |
 
-### 📦 AI Merge / 整併產出
-**AI-powered fusion engine** — not just concatenation, but genuine synthesis:
+### 📦 AI Merge Engine
+Not just concatenation, but genuine synthesis:
 
 1. **Key-term extraction** — TF-style Chinese keyword extraction (80+ stop words filtered)
 2. **Similarity matrix** — Jaccard + overlap ratio scoring
@@ -42,20 +43,18 @@ Card-based browsing, filtering by status/tag, full-text search, progress trackin
 
 Optional **merge guide** textarea lets you specify output format (e.g. "blog post", "presentation outline", "action plan").
 
-### 💾 Backup / 備份
+### 💾 Backup
 JSON export/import for full data portability.
 
 ---
 
-## Usage / 使用方式
+## Usage
 
-Open `index.html` in any browser. All data is stored in `localStorage`. No server, no setup.
-
-直接用瀏覽器打開 `index.html` 即可，資料存在瀏覽器 `localStorage`。
+Open `index.html` in any browser. All data stays in `localStorage`. No server, no setup.
 
 ---
 
-## Tech / 技術
+## Tech
 
 Pure frontend: HTML + CSS + JavaScript (ES6). Zero dependencies, zero backend.
 

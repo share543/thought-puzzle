@@ -46,6 +46,12 @@ body {
     background: rgba(88,166,255,0.1);
 }
 
+/* ===== Header ===== */
+.header {
+    text-align: center;
+    padding: 28px 20px 12px;
+    background: linear-gradient(180deg, var(--bg3) 0%, var(--bg) 100%);
+}
 .header-top {
     display: flex;
     align-items: center;
@@ -53,6 +59,7 @@ body {
     gap: 12px;
 }
 .header-top h1 { font-size: 1.8rem; letter-spacing: 2px; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
 
 /* ===== Settings Modal ===== */
 .modal-settings {

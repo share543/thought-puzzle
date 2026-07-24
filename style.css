@@ -436,6 +436,11 @@ body {
     padding: 20px;
 }
 .merge-card > p { color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }
+.merge-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.merge-header p { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.select-all-label { font-size: 0.85rem; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none; }
+.select-all-label:hover { color: var(--accent); }
+.select-all-label input { accent-color: var(--accent); }
 .merge-guide { margin-bottom: 14px; }
 .merge-guide label { display: block; color: var(--muted); font-size: 0.85rem; margin-bottom: 6px; }
 .merge-guide textarea {

@@ -447,6 +447,7 @@ function renderProgress() {
 function renderMergeList() {
     mergeList.innerHTML = '';
     const sorted = [...appData.fragments].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const allChecked = sorted.length > 0 && sorted.every(f => document.querySelector(`.merge-check[value="${f.id}"]`));
     sorted.forEach(f => {
         const item = document.createElement('label');
         item.className = 'merge-item';
@@ -461,6 +462,16 @@ function renderMergeList() {
     document.querySelectorAll('.merge-check').forEach(cb => {
         cb.addEventListener('change', updateMergeBtn);
     });
+    // Bind select-all
+    const selectAll = document.getElementById('selectAllMerge');
+    if (selectAll) {
+        selectAll.checked = sorted.length > 0 && document.querySelectorAll('.merge-check:checked').length === sorted.length;
+        selectAll.onchange = () => {
+            document.querySelectorAll('.merge-check').forEach(cb => cb.checked = selectAll.checked);
+            updateMergeBtn();
+        };
+    }
+    updateMergeBtn();
 }
 
 function updateMergeBtn() {

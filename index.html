@@ -144,7 +144,10 @@
                     <label for="mergeGuide">🧭 整併指引（可選）— 你希望整併成什麼樣的產出？</label>
                     <textarea id="mergeGuide" rows="2" placeholder="例如：一篇部落格文章 / 簡報大綱 / 行動計畫 / 學習筆記… 留空則自動整合為流暢文章"></textarea>
                 </div>
-                <p>選擇要整併的碎片：</p>
+                <div class="merge-header">
+                    <p>選擇要整併的碎片：</p>
+                    <label class="select-all-label"><input type="checkbox" id="selectAllMerge"> 全選</label>
+                </div>
                 <div id="mergeList" class="merge-list"></div>
                 <div class="merge-actions">
                     <button id="mergeBtn" class="btn-merge" disabled>✨ AI 智慧整併</button>

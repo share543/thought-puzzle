@@ -617,6 +617,13 @@ function buildNarrative(fragments, guide) {
     const { clusters, withTerms } = clusterFragments(fragments);
     const sorted = [...withTerms].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
+    // Build reverse map: original index → sorted position
+    const indexMap = {};
+    withTerms.forEach((f, i) => {
+        const sortedIdx = sorted.findIndex(s => s.id === f.id);
+        indexMap[i] = sortedIdx;
+    });
+
     // Stage 1: Understanding — what are we working with?
     const allTags = [...new Set(sorted.flatMap(f => f.tags || []))];
     const totalTerms = [...new Set(sorted.flatMap(f => f.keyTerms || []))];
@@ -625,7 +632,9 @@ function buildNarrative(fragments, guide) {
     const sections = [];
 
     clusters.forEach((indices) => {
-        const cFrags = indices.map(i => sorted[i]).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        // Map cluster indices through the reverse map to sorted positions
+        const mappedIndices = indices.map(i => indexMap[i]).filter(idx => idx !== -1);
+        const cFrags = mappedIndices.map(i => sorted[i]).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
         const theme = generateTheme(cFrags);
 
         // Build section body: weave fragments into flowing paragraphs
@@ -741,14 +750,18 @@ function mergeFragments() {
     } else {
         // Algorithm path (synchronous)
         mergeStatus.textContent = '🧠 正在分析碎片並融合思緒…';
-        setTimeout(() => {
+        try {
             const output = buildNarrative(selected, guide);
             mergeContent.textContent = output;
             mergeResult.classList.remove('hidden');
-            mergeStatus.classList.add('hidden');
-            mergeBtn.disabled = false;
-            mergeBtn.textContent = '✨ 重新整併';
-        }, 300);
+        } catch (err) {
+            mergeContent.textContent = '❌ 合併失敗：' + err.message + '\n\n請開啟瀏覽器開發者工具 (F12 → Console) 查看詳細錯誤。';
+            mergeResult.classList.remove('hidden');
+            console.error('mergeFragments error:', err);
+        }
+        mergeStatus.classList.add('hidden');
+        mergeBtn.disabled = false;
+        mergeBtn.textContent = '✨ 重新整併';
     }
 }
 

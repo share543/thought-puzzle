@@ -48,6 +48,10 @@ const FRAMEWORKS = {
             (topic) => `有沒有什麼讓你困惑的地方？`,
             (topic) => `還有什麼想補充的嗎？`,
         ]
+    },
+    'synthesis': {
+        title: '🧠 全局分析 — 從碎片提煉主題',
+        questions: [] // dynamically built in startGuide()
     }
 };
 
@@ -514,24 +518,84 @@ function copyToClipboard() {
 // ===== 🌟 Guided Dialog Engine =====
 let guideState = null;
 
-function startGuide() {
-    const topic = topicInput.value.trim();
-    if (!topic) { topicInput.focus(); return; }
+function synthesizeTopics() {
+    if (appData.fragments.length === 0) return null;
 
+    const tags = {};
+    const words = {};
+    const statuses = { 靈感: 0, 待擴展: 0, 已完成: 0 };
+    const sources = {};
+
+    appData.fragments.forEach(f => {
+        (f.tags || []).forEach(t => { tags[t] = (tags[t] || 0) + 1; });
+        f.content.split(/[\s,，。、！？\n]+/).filter(w => w.length > 1).forEach(w => {
+            words[w] = (words[w] || 0) + 1;
+        });
+        statuses[f.status] = (statuses[f.status] || 0) + 1;
+        sources[f.source || '手動輸入'] = (sources[f.source || '手動輸入'] || 0) + 1;
+    });
+
+    // Top tags & keywords (exclude generic noise)
+    const stopWords = ['這個', '那個', '什麼', '一個', '可以', '沒有', '不是', '就是', '如果', '因為', '所以', '但是', '而且', '然後', '覺得', '知道', '應該', '可能', '需要', '想要', '他們', '自己', '我們', '你們', '還有', '之後', '之前', '目前', '現在', '已經', '會不', '不會'];
+    const topTags = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const topWords = Object.entries(words).filter(([w]) => w.length > 1 && !stopWords.includes(w)).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+    // Detect theme candidates from tags + frequent words
+    const themeCandidates = [...topTags.map(([t]) => t), ...topWords.map(([w]) => w)];
+    const suggestedTopic = themeCandidates.length > 0 ? themeCandidates.slice(0, 3).join('、') : '未分類想法';
+
+    return { topTags, topWords, statuses, sources, suggestedTopic, total: appData.fragments.length };
+}
+
+function startGuide() {
     const framework = frameworkSelect.value;
     const fw = FRAMEWORKS[framework];
-    const questions = fw.questions;
     const fwTitle = fw.title;
+
+    let topic = topicInput.value.trim();
+    let questions;
+    let intro;
+
+    if (framework === 'synthesis') {
+        const analysis = synthesizeTopics();
+        if (!analysis || analysis.total < 2) {
+            alert('🧩 至少需要 2 塊碎片才能進行全局分析，先去「輸入想法」加入一些內容吧！');
+            return;
+        }
+        topic = topic || analysis.suggestedTopic;
+        const tagInfo = analysis.topTags.length
+            ? '熱門標籤：' + analysis.topTags.map(([t, c]) => `#${t}(${c})`).join(' ')
+            : '';
+        const wordInfo = analysis.topWords.length
+            ? '高頻詞：' + analysis.topWords.map(([w, c]) => `${w}(${c})`).join(' ')
+            : '';
+        // Determine coverage: which positions do fragments cluster around?
+        const pctDone = Math.round((analysis.statuses['已完成'] / analysis.total) * 100);
+        questions = [
+            (t) => `你有 ${analysis.total} 塊碎片${analysis.topTags.length ? `，主要圍繞 ${analysis.topTags.map(([t]) => '「' + t + '」').join('、')}` : ''}。你覺得這些碎片之間有什麼關聯？`,
+            (t) => `關於「${t}」，你目前已經涵蓋了哪些面向？還有什麼是還沒想到的？`,
+            (t) => `從關鍵字來看（${analysis.topWords.slice(0, 4).map(([w]) => w).join('、')}），你覺得哪一塊最重要、最值得深入？`,
+            (t) => `你目前有 ${analysis.statuses['靈感'] || 0} 塊靈感、${analysis.statuses['待擴展'] || 0} 塊待擴展、${analysis.statuses['已完成'] || 0} 塊已完成（${pctDone}%）。接下來優先發展哪個方向？`,
+            (t) => `有沒有跟這些碎片相關但還沒有寫下來的新想法？`,
+            (t) => `如果要把這些碎片整合成一個完整的論述或計畫，你覺得缺少什麼關鍵環節？`,
+            (t) => `你覺得哪塊碎片最有潛力變成實際行動？下一步具體要做什麼？`,
+        ].map(q => q(topic));
+        intro = `🧠 開始「全局分析」！\n\n📊 碎片概況：共 ${analysis.total} 塊碎片\n${tagInfo}\n${wordInfo}\n💡 建議主題：${topic}`;
+    } else {
+        if (!topic) { topicInput.focus(); return; }
+        questions = fw.questions.map(q => q(topic));
+        intro = `開始 ${fwTitle} 關於「${topic}」的對話！\n\n${questions[0]}`;
+    }
 
     guideState = {
         topic,
         framework,
         fwTitle,
-        questions: questions.map(q => q(topic)),
+        questions,
         currentQ: 0,
         answers: [],
         messages: [
-            { role: 'assistant', content: `開始 ${fwTitle} 關於「${topic}」的對話！\n\n${questions.map(q => q(topic))[0]}` }
+            { role: 'assistant', content: intro }
         ]
     };
 

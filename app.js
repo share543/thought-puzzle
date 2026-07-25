@@ -1542,6 +1542,8 @@ function isLLMReady() {
 function populateSettingsUI() {
     llmEnabledCheck.checked = llmSettings.enabled;
     llmProvider.value = llmSettings.provider || 'openrouter';
+    // Clear model input so updateProviderUI uses saved model, not stale value
+    llmModel.value = llmSettings.model || '';
     updateProviderUI();
     llmEndpoint.value = llmSettings.endpoint || LLM_PROVIDERS[llmProvider.value]?.endpoint || '';
     llmApiKey.value = llmSettings.apiKey || '';

@@ -56,7 +56,8 @@ LLM 呼叫失敗時（網路問題、金鑰錯誤、逾時），會**自動降�
 | [OpenRouter](https://openrouter.ai/) | ✅ 支援 | **預設推薦** — 瀏覽器直接可用，模型選擇多 |
 | [Groq](https://console.groq.com/) | ✅ 支援 | 速度快，適合小型模型 |
 | [Together AI](https://www.together.ai/) | ✅ 支援 | 模型選擇不錯 |
-| Ollama（本機） | ⚠️ 需自訂 CORS | 設定環境變數 `OLLAMA_ORIGINS=*` |
+| Ollama (localhost) | ⚠️ 同源才可 | 網頁須透過本機 HTTP server 開啟（如 `python -m http.server`），不可用 HTTPS 或 `file://` |
+| Ollama (外部 IP) | ⚠️ 同源才可 | 同上，或用反向代理解決 CORS |
 
 > ⚠️ OpenAI / Anthropic 原生 API **不支援瀏覽器端 CORS**，請透過 OpenRouter 等代理服務使用。
 

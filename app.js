@@ -893,7 +893,7 @@ function mergeFragments() {
 async function llmMergeFragments(fragments, guide) {
     try {
         const messages = LLMClient.makeMergePrompt(fragments, guide);
-        const result = await llmClient.chat(messages, { temperature: 0.7, maxTokens: 4096 });
+        const result = await llmClient.chat(messages, { temperature: 0.7, maxTokens: 1024 });
 
         let content = result.content.trim();
 

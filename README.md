@@ -56,7 +56,8 @@ When LLM calls fail (network error, invalid key, timeout), the tool silently fal
 | [OpenRouter](https://openrouter.ai/) | ✅ Yes | **Recommended default** — works immediately in browser, many models |
 | [Groq](https://console.groq.com/) | ✅ Yes | Very fast, good for smaller models |
 | [Together AI](https://www.together.ai/) | ✅ Yes | Good model selection |
-| Ollama (localhost) | ⚠️ Requires CORS config | `OLLAMA_ORIGINS=*` or set explicit origins |
+| Ollama (localhost) | ⚠️ Same-origin required | Serve page via local HTTP server (`python -m http.server`), not HTTPS or `file://` |
+| Ollama (LAN IP) | ⚠️ Same-origin required | Same as above, or use a reverse proxy for CORS |
 
 > ⚠️ OpenAI / Anthropic native APIs do **not** support browser-side CORS. Use OpenRouter as a proxy instead.
 

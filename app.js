@@ -221,11 +221,86 @@ const LLM_SETTINGS_KEY = 'thought-puzzle-llm-settings';
 let llmClient = null;
 let llmSettings = {
     enabled: false,
-    endpoint: '',
+    provider: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1',
     apiKey: '',
     model: 'gpt-4o-mini',
     temperature: 0.7,
     maxTokens: 4096
+};
+
+// Provider database: endpoint, key hint, free models per provider
+const LLM_PROVIDERS = {
+    openrouter: {
+        name: 'OpenRouter',
+        endpoint: 'https://openrouter.ai/api/v1',
+        keyHint: '🔑 https://openrouter.ai/keys — 支援多家模型',
+        models: [
+            { id: 'gpt-4o-mini', label: 'GPT-4o Mini (免費)' },
+            { id: 'gpt-4o', label: 'GPT-4o' },
+            { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+            { id: 'claude-3-5-haiku', label: 'Claude 3.5 Haiku' },
+            { id: 'gemini-2.0-flash-001', label: 'Gemini 2.0 Flash' },
+            { id: 'deepseek-chat', label: 'DeepSeek V3' },
+            { id: 'qwen-turbo', label: 'Qwen Turbo' },
+            { id: 'mistral-small-latest', label: 'Mistral Small' }
+        ]
+    },
+    groq: {
+        name: 'Groq',
+        endpoint: 'https://api.groq.com/openai/v1',
+        keyHint: '🔑 https://console.groq.com/keys — 超快推理速度',
+        models: [
+            { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B (免費)' },
+            { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (免費)' },
+            { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B (免費)' },
+            { id: 'gemma2-9b-it', label: 'Gemma 2 9B (免費)' },
+            { id: 'deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 70B' }
+        ]
+    },
+    together: {
+        name: 'Together AI',
+        endpoint: 'https://api.together.xyz/v1',
+        keyHint: '🔑 https://api.together.ai/settings/api-keys',
+        models: [
+            { id: 'mistralai/Mixtral-8x22B-Instruct-v0.1', label: 'Mixtral 8x22B' },
+            { id: 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo', label: 'Llama 3.1 70B' },
+            { id: 'Qwen/Qwen2.5-72B-Instruct-Turbo', label: 'Qwen 2.5 72B' },
+            { id: 'deepseek-ai/DeepSeek-V3', label: 'DeepSeek V3' },
+            { id: 'google/gemma-2-27b-it', label: 'Gemma 2 27B' }
+        ]
+    },
+    github: {
+        name: 'GitHub Models',
+        endpoint: 'https://models.inference.ai.azure.com',
+        keyHint: '🔑 https://github.com/settings/tokens — 用 GitHub PAT 免費呼叫',
+        models: [
+            { id: 'gpt-4o-mini', label: 'GPT-4o Mini (免費)' },
+            { id: 'gpt-4o', label: 'GPT-4o (免費)' },
+            { id: 'gpt-4', label: 'GPT-4' },
+            { id: 'gpt-4-turbo', label: 'GPT-4 Turbo' }
+        ]
+    },
+    ollama: {
+        name: 'Ollama (本機)',
+        endpoint: 'http://localhost:11434/v1',
+        keyHint: '⚠️ 本機執行不需金鑰，留空即可',
+        models: [
+            { id: 'llama3.2', label: 'Llama 3.2' },
+            { id: 'mistral', label: 'Mistral' },
+            { id: 'qwen2.5', label: 'Qwen 2.5' },
+            { id: 'gemma2', label: 'Gemma 2' },
+            { id: 'deepseek-r1:8b', label: 'DeepSeek R1 8B' }
+        ]
+    },
+    custom: {
+        name: '自訂',
+        endpoint: '',
+        keyHint: '手動輸入端點 URL 和金鑰，須支援 /v1/chat/completions',
+        models: [
+            { id: 'gpt-4o-mini', label: 'gpt-4o-mini' }
+        ]
+    }
 };
 
 // Settings DOM refs
@@ -233,10 +308,13 @@ const settingsBtn = $('settingsBtn');
 const settingsModal = $('settingsModal');
 const llmEnabledCheck = $('llmEnabled');
 const settingsFields = $('settingsFields');
+const llmProvider = $('llmProvider');
 const llmEndpoint = $('llmEndpoint');
 const llmApiKey = $('llmApiKey');
+const keyHint = $('keyHint');
 const toggleKeyBtn = $('toggleKeyBtn');
 const llmModel = $('llmModel');
+const modelHint = $('modelHint');
 const llmTemperature = $('llmTemperature');
 const tempValue = $('tempValue');
 const llmMaxTokens = $('llmMaxTokens');
@@ -244,6 +322,43 @@ const testConnectionBtn = $('testConnectionBtn');
 const testResult = $('testResult');
 const saveSettingsBtn = $('saveSettingsBtn');
 const cancelSettingsBtn = $('cancelSettingsBtn');
+
+/**
+ * Update provider-dependent UI: endpoint URL, model list, hints
+ */
+function updateProviderUI() {
+    const provider = llmProvider.value;
+    const prov = LLM_PROVIDERS[provider];
+    if (!prov) return;
+
+    // Endpoint: auto-fill, editable only for custom
+    llmEndpoint.value = prov.endpoint;
+    llmEndpoint.readOnly = provider !== 'custom';
+
+    // Key hint
+    keyHint.textContent = prov.keyHint;
+
+    // Model list
+    const modelSuggestions = document.getElementById('modelSuggestions');
+    modelSuggestions.innerHTML = '';
+    prov.models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.label;
+        modelSuggestions.appendChild(opt);
+    });
+
+    // Preserve existing or saved model value if it's in the list
+    const currentModel = llmModel.value || llmSettings.model;
+    if (currentModel && prov.models.some(m => m.id === currentModel)) {
+        llmModel.value = currentModel;
+    } else {
+        llmModel.value = prov.models[0]?.id || '';
+    }
+
+    // Model hint
+    modelHint.textContent = `${prov.models.length} 個模型可選，也可自行輸入`;
+}
 
 // ===== Tab Navigation =====
 let currentTab = 'input';
@@ -1366,6 +1481,21 @@ function loadLLMSettings() {
         const raw = localStorage.getItem(LLM_SETTINGS_KEY);
         if (raw) {
             const saved = JSON.parse(raw);
+            // Migration: old settings didn't have 'provider', infer it
+            if (!saved.provider && saved.endpoint) {
+                // Try to match known providers
+                for (const [key, prov] of Object.entries(LLM_PROVIDERS)) {
+                    if (key === 'custom') continue;
+                    if (saved.endpoint.includes(prov.endpoint) || prov.endpoint.includes(saved.endpoint)) {
+                        saved.provider = key;
+                        break;
+                    }
+                }
+                if (!saved.provider) {
+                    saved.provider = 'custom';
+                }
+            }
+            if (!saved.provider) saved.provider = 'openrouter';
             llmSettings = { ...llmSettings, ...saved };
         }
     } catch {}
@@ -1407,9 +1537,10 @@ function isLLMReady() {
 // Populate settings UI from state
 function populateSettingsUI() {
     llmEnabledCheck.checked = llmSettings.enabled;
-    llmEndpoint.value = llmSettings.endpoint || '';
+    llmProvider.value = llmSettings.provider || 'openrouter';
+    updateProviderUI();
+    llmEndpoint.value = llmSettings.endpoint || LLM_PROVIDERS[llmProvider.value]?.endpoint || '';
     llmApiKey.value = llmSettings.apiKey || '';
-    llmModel.value = llmSettings.model || 'gpt-4o-mini';
     llmTemperature.value = llmSettings.temperature;
     tempValue.textContent = llmSettings.temperature;
     llmMaxTokens.value = llmSettings.maxTokens;
@@ -1419,6 +1550,7 @@ function populateSettingsUI() {
 // Read UI back into state
 function readSettingsFromUI() {
     llmSettings.enabled = llmEnabledCheck.checked;
+    llmSettings.provider = llmProvider.value;
     llmSettings.endpoint = llmEndpoint.value.trim();
     llmSettings.apiKey = llmApiKey.value.trim();
     llmSettings.model = llmModel.value.trim() || 'gpt-4o-mini';
@@ -1458,6 +1590,14 @@ toggleKeyBtn.addEventListener('click', () => {
 // Temperature slider live display
 llmTemperature.addEventListener('input', () => {
     tempValue.textContent = llmTemperature.value;
+});
+
+// Provider change → update endpoint & models
+llmProvider.addEventListener('change', () => {
+    updateProviderUI();
+    if (llmModel.value) {
+        llmModel.focus();
+    }
 });
 
 // Enable/disable fields toggle

@@ -196,9 +196,21 @@
 
             <div id="settingsFields" class="settings-fields">
                 <div class="field-group">
+                    <label for="llmProvider">API 提供者</label>
+                    <select id="llmProvider" class="settings-input settings-select">
+                        <option value="openrouter">🌐 OpenRouter (推薦)</option>
+                        <option value="groq">⚡ Groq</option>
+                        <option value="together">🤝 Together AI</option>
+                        <option value="github">💎 GitHub Models</option>
+                        <option value="ollama">🦙 Ollama (本機)</option>
+                        <option value="custom">✏️ 自訂</option>
+                    </select>
+                </div>
+
+                <div class="field-group">
                     <label for="llmEndpoint">API 端點 URL</label>
-                    <input id="llmEndpoint" type="url" placeholder="https://openrouter.ai/api/v1" class="settings-input">
-                    <span class="field-hint">須支援 OpenAI-compatible <code>/v1/chat/completions</code></span>
+                    <input id="llmEndpoint" type="url" class="settings-input" readonly>
+                    <span class="field-hint">選擇提供者會自動填入，選「自訂」可手動修改</span>
                 </div>
 
                 <div class="field-group">
@@ -207,25 +219,16 @@
                         <input id="llmApiKey" type="password" placeholder="sk-..." class="settings-input">
                         <button id="toggleKeyBtn" class="btn-icon" title="顯示/隱藏金鑰">👁️</button>
                     </div>
-                    <span class="field-hint">僅存於瀏覽器 localStorage，不留伺服器</span>
+                    <span class="field-hint" id="keyHint">僅存於瀏覽器 localStorage，不留伺服器</span>
                 </div>
 
                 <div class="field-group">
                     <label for="llmModel">模型名稱</label>
                     <div class="model-row">
-                        <input id="llmModel" type="text" placeholder="gpt-4o-mini" class="settings-input" list="modelSuggestions">
-                        <datalist id="modelSuggestions">
-                            <option value="gpt-4o-mini">
-                            <option value="gpt-4o">
-                            <option value="claude-sonnet-4-20250514">
-                            <option value="claude-3-5-haiku">
-                            <option value="gemini-2.0-flash-001">
-                            <option value="deepseek-chat">
-                            <option value="qwen-turbo">
-                            <option value="mistral-small-latest">
-                        </datalist>
+                        <input id="llmModel" type="text" class="settings-input" list="modelSuggestions">
+                        <datalist id="modelSuggestions"></datalist>
                     </div>
-                    <span class="field-hint">常用模型預填在上方，也可自由輸入</span>
+                    <span class="field-hint" id="modelHint"></span>
                 </div>
 
                 <details class="settings-advanced">
@@ -273,7 +276,7 @@
         </div>
     </div>
 
-    <script src="js/llm-client.js?v=2"></script>
-    <script src="app.js?v=2"></script>
+    <script src="js/llm-client.js?v=3"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>

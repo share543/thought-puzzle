@@ -176,6 +176,24 @@ body {
 }
 .btn-icon:hover { border-color: var(--accent); }
 .model-row { position: relative; }
+.settings-select {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+    appearance: auto;
+    -webkit-appearance: auto;
+    transition: border-color 0.2s;
+}
+.settings-select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
 
 .settings-advanced {
     background: var(--bg);

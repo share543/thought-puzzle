@@ -1,4 +1,6 @@
 // ===== 思維拼圖 — app.js v2 =====
+const VERSION = '2.0.0';
+const GIT_TAG = 'v2.0.0';
 
 // ===== Framework Question Generators =====
 const FRAMEWORKS = {
@@ -1662,6 +1664,12 @@ saveSettingsBtn.addEventListener('click', () => {
 // Init LLM on load
 loadLLMSettings();
 initLLMClient();
+
+// Show version in footer
+const versionBadge = document.getElementById('versionBadge');
+if (versionBadge && typeof VERSION !== 'undefined') {
+    versionBadge.textContent = 'v' + VERSION;
+}
 
 // ===== Keyboard Shortcuts =====
 thoughtInput.addEventListener('keydown', e => {

@@ -99,6 +99,12 @@ LLM 客戶端使用標準 OpenAI-compatible `/v1/chat/completions` 介面，任�
 
 ---
 
+## 版本
+
+**v2.0.0** — 查看 [GitHub 發佈](https://github.com/share543/thought-puzzle/releases)。
+
+---
+
 ## GitHub Pages
 
 **https://share543.github.io/thought-puzzle/**

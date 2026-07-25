@@ -100,6 +100,12 @@ LLM client: OpenAI-compatible `/v1/chat/completions` — works with any provider
 
 ---
 
+## Version
+
+**v2.0.0** — see [GitHub releases](https://github.com/share543/thought-puzzle/releases).
+
+---
+
 ## GitHub Pages
 
 **https://share543.github.io/thought-puzzle/**

@@ -352,10 +352,13 @@ function updateProviderUI() {
         modelSuggestions.appendChild(opt);
     });
 
-    // Preserve existing or saved model value if it's in the list
-    const currentModel = llmModel.value || llmSettings.model;
-    if (currentModel && prov.models.some(m => m.id === currentModel)) {
-        llmModel.value = currentModel;
+    // Preserve saved or current model value
+    const savedModel = llmSettings.model || '';
+    if (savedModel && prov.models.some(m => m.id === savedModel)) {
+        llmModel.value = savedModel;
+    } else if (savedModel) {
+        // Custom/free-text model — keep it
+        llmModel.value = savedModel;
     } else {
         llmModel.value = prov.models[0]?.id || '';
     }

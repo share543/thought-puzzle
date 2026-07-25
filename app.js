@@ -286,9 +286,9 @@ const LLM_PROVIDERS = {
         ]
     },
     ollama: {
-        name: 'Ollama (本機)',
+        name: 'Ollama (本機/LAN)',
         endpoint: 'http://localhost:11434/v1',
-        keyHint: '⚠️ 本機執行不需金鑰，留空即可',
+        keyHint: '⚠️ 本機或區域網路執行不需金鑰，端點可自行修改（如 http://192.168.0.x:11434/v1）',
         models: [
             { id: 'llama3.2', label: 'Llama 3.2' },
             { id: 'mistral', label: 'Mistral' },
@@ -335,9 +335,9 @@ function updateProviderUI() {
     const prov = LLM_PROVIDERS[provider];
     if (!prov) return;
 
-    // Endpoint: auto-fill, editable only for custom
+    // Endpoint: auto-fill, editable only for custom or ollama (LAN users)
     llmEndpoint.value = prov.endpoint;
-    llmEndpoint.readOnly = provider !== 'custom';
+    llmEndpoint.readOnly = provider !== 'custom' && provider !== 'ollama';
 
     // Key hint
     keyHint.textContent = prov.keyHint;

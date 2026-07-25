@@ -26,7 +26,7 @@ class LLMClient {
      * 是否已完成基本設定
      */
     isConfigured() {
-        return !!(this.endpoint && this.apiKey && this.model);
+        return !!(this.endpoint && this.model);
     }
 
     /**
@@ -46,15 +46,17 @@ class LLMClient {
      */
     async testConnection() {
         if (!this.endpoint) return { ok: false, message: '請輸入 API 端點 URL' };
-        if (!this.apiKey) return { ok: false, message: '請輸入 API 金鑰' };
 
         try {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (this.apiKey) {
+                headers['Authorization'] = `Bearer ${this.apiKey}`;
+            }
             const resp = await fetch(this.getApiUrl(), {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
+                headers,
                 body: JSON.stringify({
                     model: this.model || 'gpt-4o-mini',
                     messages: [
@@ -98,19 +100,22 @@ class LLMClient {
      */
     async chat(messages, options = {}) {
         if (!this.isConfigured()) {
-            throw new Error('LLM 尚未設定 — 請先在設定面板填入 API 端點和金鑰');
+            throw new Error('LLM 尚未設定 — 請先在設定面板填入 API 端點和模型');
         }
 
         this.abortController = new AbortController();
         const signal = options.signal || this.abortController.signal;
 
         try {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (this.apiKey) {
+                headers['Authorization'] = `Bearer ${this.apiKey}`;
+            }
             const resp = await fetch(this.getApiUrl(), {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
+                headers,
                 body: JSON.stringify({
                     model: this.model,
                     messages,

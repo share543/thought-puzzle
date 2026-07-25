@@ -1615,11 +1615,6 @@ testConnectionBtn.addEventListener('click', async () => {
         testResult.className = 'test-result error';
         return;
     }
-    if (!llmSettings.apiKey) {
-        testResult.textContent = '請輸入 API 金鑰';
-        testResult.className = 'test-result error';
-        return;
-    }
 
     testResult.textContent = '⏳ 測試中…';
     testResult.className = 'test-result';

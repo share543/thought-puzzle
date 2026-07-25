@@ -1621,6 +1621,14 @@ testConnectionBtn.addEventListener('click', async () => {
         return;
     }
 
+    // Auto-prepend http:// if missing
+    let url = llmSettings.endpoint.trim();
+    if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'http://' + url;
+        llmEndpoint.value = url;
+        llmSettings.endpoint = url;
+    }
+
     testResult.textContent = '⏳ 測試中…';
     testResult.className = 'test-result';
     testConnectionBtn.disabled = true;

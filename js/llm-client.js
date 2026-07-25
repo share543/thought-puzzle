@@ -54,6 +54,26 @@ class LLMClient {
             if (this.apiKey) {
                 headers['Authorization'] = `Bearer ${this.apiKey}`;
             }
+            // Try models list endpoint first (broader compatibility)
+            const baseUrl = this.endpoint.replace(/\/+$/, '').replace(/\/chat\/completions\/?$/, '');
+            const modelUrl = baseUrl + '/models';
+
+            let modelResp;
+            try {
+                modelResp = await fetch(modelUrl, {
+                    headers,
+                    signal: AbortSignal.timeout(5000)
+                });
+            } catch {}
+
+            if (modelResp && modelResp.ok) {
+                const data = await modelResp.json();
+                const modelList = data.data || [];
+                const models = modelList.map(m => m.id).join(', ') || '—';
+                return { ok: true, message: `✅ 伺服器連線成功！可用模型：${models}` };
+            }
+
+            // Fallback: try a minimal chat completion
             const resp = await fetch(this.getApiUrl(), {
                 method: 'POST',
                 headers,
@@ -83,10 +103,10 @@ class LLMClient {
             return { ok: true, message: `✅ 連線成功！使用模型：${model}` };
         } catch (err) {
             if (err.name === 'TimeoutError' || err.name === 'AbortError') {
-                return { ok: false, message: '⏱️ 連線逾時（15 秒），請檢查端點 URL 是否正確' };
+                return { ok: false, message: '⏱️ 連線逾時（15 秒），請檢查伺服器是否正在執行' };
             }
-            if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
-                return { ok: false, message: '🌐 網路連線失敗 — 可能是 CORS 限制或端點不可達' };
+            if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError') || err.message?.includes('Load failed')) {
+                return { ok: false, message: '🌐 無法連線 — 請檢查：\n1️⃣ 伺服器是否已啟動\n2️⃣ 端點 URL 是否正確\n3️⃣ 是否需開放 CORS（在 LLM Router 設定中啟用 CORS）' };
             }
             return { ok: false, message: `❌ ${err.message || '未知錯誤'}` };
         }

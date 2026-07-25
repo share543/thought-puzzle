@@ -207,6 +207,10 @@ const exportJsonBtn = $('exportJsonBtn');
 const importJsonBtn = $('importJsonBtn');
 const importFile = $('importFile');
 const clearAllBtn = $('clearAllBtn');
+const tagManagerBtn = $('tagManagerBtn');
+const tagManagerModal = $('tagManagerModal');
+const tagManagerList = $('tagManagerList');
+const tagManagerCloseBtn = $('tagManagerCloseBtn');
 
 // Modal
 const editModal = $('editModal');
@@ -1671,6 +1675,83 @@ clearAllBtn.onclick = clearAll;
 saveEditBtn.onclick = saveEdit;
 cancelEditBtn.onclick = closeEditModal;
 editModal.onclick = (e) => { if (e.target === editModal) closeEditModal(); };
+
+// ===== Tag Manager =====
+function openTagManager() {
+    renderTagManager();
+    tagManagerModal.classList.remove('hidden');
+}
+function closeTagManager() {
+    tagManagerModal.classList.add('hidden');
+}
+function renderTagManager() {
+    const allTags = getAllTags();
+    tagManagerList.innerHTML = '';
+    if (allTags.length === 0) {
+        tagManagerList.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">還沒有標籤，輸入想法時加入第一個標籤吧！</p>';
+        return;
+    }
+    allTags.forEach(tag => {
+        const count = appData.fragments.filter(f => (f.tags || []).includes(tag)).length;
+        const item = document.createElement('div');
+        item.className = 'tagman-item';
+        item.innerHTML = `
+            <span class="tagman-item-label">
+                🏷️ ${escapeHtml(tag)}
+                <span class="tagman-count">(${count} 個碎片)</span>
+            </span>
+            <button class="tagman-rename" data-tag="${escapeHtml(tag)}">✏️ 改名</button>
+            <button class="tagman-delete" data-tag="${escapeHtml(tag)}">🗑️</button>
+        `;
+        // Rename handler
+        item.querySelector('.tagman-rename').onclick = () => {
+            const newName = prompt(`將標籤「${tag}」改名為：`, tag);
+            if (newName && newName.trim() && newName.trim() !== tag) {
+                renameTag(tag, newName.trim());
+                renderTagManager();
+                render();
+            }
+        };
+        // Delete handler
+        item.querySelector('.tagman-delete').onclick = () => {
+            if (confirm(`確定刪除標籤「${tag}」？將從 ${count} 個碎片中一併移除。`)) {
+                deleteTag(tag);
+                renderTagManager();
+                render();
+            }
+        };
+        tagManagerList.appendChild(item);
+    });
+}
+function renameTag(oldName, newName) {
+    // Update all fragments that have this tag
+    appData.fragments.forEach(f => {
+        if ((f.tags || []).includes(oldName)) {
+            f.tags = f.tags.map(t => t === oldName ? newName : t);
+        }
+    });
+    // Update tags master list
+    if (appData.tags) {
+        appData.tags = appData.tags.map(t => t === oldName ? newName : t);
+    }
+    saveData(appData);
+}
+function deleteTag(tag) {
+    // Remove from all fragments
+    appData.fragments.forEach(f => {
+        if ((f.tags || []).includes(tag)) {
+            f.tags = f.tags.filter(t => t !== tag);
+        }
+    });
+    // Remove from master list
+    if (appData.tags) {
+        appData.tags = appData.tags.filter(t => t !== tag);
+    }
+    saveData(appData);
+}
+tagManagerBtn.onclick = openTagManager;
+tagManagerCloseBtn.onclick = closeTagManager;
+tagManagerModal.onclick = (e) => { if (e.target === tagManagerModal) closeTagManager(); };
 
 // ===== Master Render =====
 function render() {

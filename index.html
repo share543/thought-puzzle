@@ -170,6 +170,7 @@
     <!-- ===== Footer ===== -->
     <footer class="footer">
         <div class="footer-actions">
+            <button id="tagManagerBtn" class="btn-footer">🏷️ 管理標籤</button>
             <button id="exportJsonBtn" class="btn-footer">💾 匯出 JSON</button>
             <button id="importJsonBtn" class="btn-footer">📂 匯入 JSON</button>
             <input type="file" id="importFile" accept=".json" style="display:none">
@@ -276,7 +277,21 @@
         </div>
     </div>
 
-    <script src="js/llm-client.js?v=3"></script>
-    <script src="app.js?v=3"></script>
+    <!-- ===== Tag Manager Modal ===== -->
+    <div id="tagManagerModal" class="modal hidden">
+        <div class="modal-content modal-tagman">
+            <div class="tagman-header">
+                <h3>🏷️ 標籤管理員</h3>
+                <span class="settings-subtitle">檢視、改名、刪除所有標籤</span>
+            </div>
+            <div id="tagManagerList" class="tagman-list"></div>
+            <div class="modal-btns">
+                <button id="tagManagerCloseBtn" class="btn-footer">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/llm-client.js?v=4"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>
